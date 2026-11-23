@@ -1,0 +1,132 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function changedOnly(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    // ---------------- Users ----------------
+    // Public profile (name, email, avatar, currency) is readable by signed-in
+    // users so people can find each other. Private data lives in /private.
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId)
+        && request.resource.data.uid == userId;
+      allow update: if isOwner(userId)
+        && request.resource.data.uid == resource.data.uid;
+      allow delete: if isOwner(userId);
+
+      match /private/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Friend list. The other party may:
+      //  - create my copy of them when accepting MY request to them,
+      //  - refresh their own name/avatar on my copy,
+      //  - delete it when unfriending.
+      match /friends/{friendId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          || (isOwner(friendId)
+              && exists(/databases/$(database)/documents/users/$(request.auth.uid)/friendRequests/$(userId)));
+        allow update: if isOwner(userId)
+          || (isOwner(friendId) && changedOnly(['name', 'avatarUrl', 'email']));
+        allow delete: if isOwner(userId) || isOwner(friendId);
+      }
+
+      // Incoming requests; document id == sender uid.
+      match /friendRequests/{requestId} {
+        allow read: if isOwner(userId) || isOwner(requestId);
+        allow create: if isOwner(requestId)
+          && requestId != userId
+          && request.resource.data.fromUid == request.auth.uid
+          && request.resource.data.status == 'pending';
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId) || isOwner(requestId);
+      }
+
+      // Inbox. Anyone signed in may drop a notification, but must identify
+      // themselves; only the owner can read / mark / delete.
+      match /notifications/{notificationId} {
+        allow read, delete: if isOwner(userId);
+        allow update: if isOwner(userId) && changedOnly(['isRead']);
+        allow create: if isSignedIn()
+          && request.resource.data.fromUid == request.auth.uid
+          && request.resource.data.isRead == false
+          && request.resource.data.title is string
+          && request.resource.data.title.size() <= 100
+          && request.resource.data.message is string
+          && request.resource.data.message.size() <= 500;
+      }
+    }
+
+    // Lets a user list the requests they've sent (collection-group query).
+    match /{path=**}/friendRequests/{requestId} {
+      allow read: if isSignedIn() && resource.data.fromUid == request.auth.uid;
+    }
+
+    // ---------------- Groups ----------------
+    match /groups/{groupId} {
+      allow read: if isSignedIn()
+        && request.auth.uid in resource.data.members;
+      allow create: if isSignedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.auth.uid in request.resource.data.members
+        && request.resource.data.members.size() <= 100;
+      // Members can edit; the creator can never be swapped out.
+      allow update: if isSignedIn()
+        && request.auth.uid in resource.data.members
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.members.size() <= 100;
+      allow delete: if isSignedIn()
+        && resource.data.createdBy == request.auth.uid;
+    }
+
+    // ---------------- Expenses & payments ----------------
+    function creatorOf(data) {
+      return data.get('createdBy', data.paidBy.uid);
+    }
+
+    function validExpense(data) {
+      return data.amount is number
+        && data.amount > 0
+        && data.involvedUsers is list
+        && data.involvedUsers.size() >= 2
+        && data.involvedUsers.size() <= 100
+        && request.auth.uid in data.involvedUsers
+        && data.individualSplits is map;
+    }
+
+    match /expenses/{expenseId} {
+      allow read: if isSignedIn()
+        && request.auth.uid in resource.data.involvedUsers;
+
+      allow create: if isSignedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && validExpense(request.resource.data);
+
+      // The creator may edit anything (but not hand ownership away).
+      // Other participants may only change settlement state.
+      allow update: if isSignedIn()
+        && request.auth.uid in resource.data.involvedUsers
+        && (
+          (creatorOf(resource.data) == request.auth.uid
+            && request.resource.data.get('createdBy', request.auth.uid) == request.auth.uid
+            && validExpense(request.resource.data))
+          || changedOnly(['settledPairs', 'isSettled', 'updatedAt'])
+        );
+
+      allow delete: if isSignedIn()
+        && creatorOf(resource.data) == request.auth.uid;
+    }
+  }
+}
