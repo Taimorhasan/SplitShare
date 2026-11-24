@@ -275,7 +275,7 @@ class TripException implements Exception {
   String toString() => message;
 }
 
-/// Trips ("Trip Split"): a standalone calculator for a day out / trip where
+/// Trips ("Lain Dain"): a standalone calculator for a day out / trip where
 /// several people pay for things and you want to know who owes whom at the
 /// end. People don't need SplitShare accounts; app users added from friends
 /// can open the same trip.

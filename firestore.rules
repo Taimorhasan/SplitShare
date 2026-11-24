@@ -91,7 +91,7 @@ service cloud.firestore {
         && resource.data.createdBy == request.auth.uid;
     }
 
-    // ---------------- Trip Split ----------------
+    // ---------------- Lain Dain ----------------
     // Standalone trip calculators. Anyone in memberUids (the creator plus
     // SplitShare friends added to the trip) can view and edit it.
     match /trips/{tripId} {

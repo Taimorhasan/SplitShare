@@ -1337,7 +1337,7 @@ class _DashboardSkeleton extends StatelessWidget {
 }
 
 
-/// Entry to "Trip Split": log who paid on a trip / day out and get the
+/// Entry to "Lain Dain": log who paid on a trip / day out and get the
 /// fewest "X pays Y" transfers.
 class _TripSplitBanner extends StatelessWidget {
   const _TripSplitBanner();
@@ -1371,7 +1371,7 @@ class _TripSplitBanner extends StatelessWidget {
                 final trips = TripController.to.trips;
                 final open = trips.where((t) => t.plan.isNotEmpty).length;
                 final subtitle = trips.isEmpty
-                    ? 'Log who paid on a trip and see who owes whom'
+                    ? 'Give & take — log who paid, see who owes whom'
                     : open == 0
                         ? '${trips.length} ${trips.length == 1 ? 'trip' : 'trips'} · all settled'
                         : '$open ${open == 1 ? 'trip has' : 'trips have'} people to pay back';
@@ -1379,7 +1379,7 @@ class _TripSplitBanner extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Trip Split',
+                      'Lain Dain',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,

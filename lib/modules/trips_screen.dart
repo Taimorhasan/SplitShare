@@ -6,7 +6,7 @@ import '../controllers/profile_controller.dart';
 import '../controllers/trip_controller.dart';
 import '../core/ui.dart';
 
-/// "Trip Split": list of trips / days out. Each trip is a small calculator
+/// "Lain Dain": list of trips / days out. Each trip is a small calculator
 /// where people log what they paid and the app works out who pays whom.
 class TripsScreen extends StatelessWidget {
   const TripsScreen({super.key});
@@ -27,8 +27,8 @@ class TripsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppTopBar(
-        title: 'Trip Split',
-        subtitle: 'Log who paid, see who owes whom',
+        title: 'Lain Dain',
+        subtitle: 'Give & take — who paid, who owes',
         actions: [
           AppIconButton(
             icon: Icons.add_rounded,
