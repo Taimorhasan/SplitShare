@@ -79,10 +79,18 @@ with the receiver's split equal to the amount, so it nets the debt down.
 
 ## Setup
 
+The Firebase config files are **not** in this repository (they contain the
+project's API keys). Generate your own before the first run:
+
 ```bash
+dart pub global activate flutterfire_cli
+flutterfire configure        # creates lib/firebase_options.dart and
+                             # android/app/google-services.json
 flutter pub get
 flutter run
 ```
+
+These files are listed in `.gitignore` — never commit them.
 
 ### Deploy Firebase rules and indexes (required)
 
