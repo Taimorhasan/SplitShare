@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,8 +12,12 @@ import '../core/ui.dart';
 import '../firebase_options.dart';
 import '../main.dart' show firebaseInitError, registerControllers;
 
-/// Brand moment shown on launch. Decides where to go next:
-/// onboarding (first run) → home (signed in) → login.
+/// Animated brand intro shown on every launch, then routes to:
+/// onboarding (first run) → home (already signed in) → login.
+///
+/// It starts on the exact frame of the native Android launch screen (solid
+/// brand indigo with the white SplitShare mark, 108dp, centred) so the
+/// hand-over from the OS splash to Flutter is seamless.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -20,32 +27,42 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
+  static const _introDuration = Duration(milliseconds: 1500);
+
+  late final AnimationController _ctrl =
+      AnimationController(vsync: this, duration: _introDuration);
+
+  // 0.00–0.45  white tile grows in behind the mark
+  late final Animation<double> _tile = CurvedAnimation(
+    parent: _ctrl,
+    curve: const Interval(0.0, 0.45, curve: Curves.easeOutBack),
   );
-  late final Animation<double> _logoScale = Tween<double>(begin: 0.6, end: 1)
-      .animate(CurvedAnimation(
-          parent: _ctrl, curve: const Interval(0, 0.7, curve: Curves.easeOutBack)));
-  late final Animation<double> _logoFade = CurvedAnimation(
-      parent: _ctrl, curve: const Interval(0, 0.5, curve: Curves.easeOut));
-  late final Animation<double> _textFade = CurvedAnimation(
-      parent: _ctrl, curve: const Interval(0.35, 1, curve: Curves.easeOut));
-  late final Animation<Offset> _textSlide =
-      Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-          CurvedAnimation(
-              parent: _ctrl,
-              curve: const Interval(0.35, 1, curve: AppMotion.curve)));
+  // 0.10–0.55  mark lifts upward to make room for the wordmark
+  late final Animation<double> _lift = CurvedAnimation(
+    parent: _ctrl,
+    curve: const Interval(0.10, 0.55, curve: Curves.easeInOutCubic),
+  );
+  // 0.40–0.85  wordmark + tagline fade/slide in
+  late final Animation<double> _text = CurvedAnimation(
+    parent: _ctrl,
+    curve: const Interval(0.40, 0.85, curve: Curves.easeOutCubic),
+  );
+  // 0.00–1.00  background warms from solid indigo into the hero gradient
+  late final Animation<double> _bg = CurvedAnimation(
+    parent: _ctrl,
+    curve: Curves.easeInOut,
+  );
 
   Object? _error;
   bool _retrying = false;
+  bool _navigated = false;
 
   @override
   void initState() {
     super.initState();
-    _ctrl.forward();
     _error = firebaseInitError;
-    if (_error == null) _continue();
+    _ctrl.forward();
+    if (_error == null) unawaited(_continue());
   }
 
   @override
@@ -54,29 +71,46 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
+  /// Resolves the destination while the intro plays, then navigates once both
+  /// are done.
   Future<void> _continue() async {
-    // Let the brand animation play briefly, while resolving the route.
-    final minDelay = Future<void>.delayed(const Duration(milliseconds: 900));
-    String route;
+    final intro = _ctrl.isCompleted
+        ? Future<void>.value()
+        : _ctrl.forward().orCancel.catchError((_) {});
+    final route = await _resolveRoute();
+    await intro;
+    // A short hold on the finished frame so the brand registers.
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    if (!mounted || _navigated) return;
+    _navigated = true;
+    Get.offAllNamed(route);
+  }
+
+  Future<String> _resolveRoute() async {
+    var onboarded = true;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final onboarded = prefs.getBool('onboarding_complete') ?? false;
-      if (!onboarded) {
-        route = AppRoutes.onboarding;
-      } else if (FirebaseAuth.instance.currentUser != null) {
-        route = AppRoutes.home;
-      } else {
-        route = AppRoutes.login;
-      }
+      onboarded = prefs.getBool('onboarding_complete') ?? false;
     } catch (e) {
-      debugPrint('Splash routing failed: $e');
-      route = FirebaseAuth.instance.currentUser != null
-          ? AppRoutes.home
-          : AppRoutes.login;
+      debugPrint('Splash: could not read preferences: $e');
     }
-    await minDelay;
-    if (!mounted) return;
-    Get.offAllNamed(route);
+    if (!onboarded) return AppRoutes.onboarding;
+
+    // Wait for Firebase to restore the persisted session instead of reading
+    // `currentUser` immediately (it can still be null right after start-up,
+    // which used to send signed-in users to the login screen).
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      try {
+        user = await FirebaseAuth.instance
+            .authStateChanges()
+            .first
+            .timeout(const Duration(seconds: 4));
+      } catch (_) {
+        user = FirebaseAuth.instance.currentUser;
+      }
+    }
+    return user != null ? AppRoutes.home : AppRoutes.login;
   }
 
   Future<void> _retry() async {
@@ -94,7 +128,7 @@ class _SplashScreenState extends State<SplashScreen>
         _error = null;
         _retrying = false;
       });
-      _continue();
+      unawaited(_continue());
     } catch (e) {
       debugPrint('Firebase retry failed: $e');
       firebaseInitError = e;
@@ -110,76 +144,208 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.primaryLight, AppColors.background],
-          ),
-        ),
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) => SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.page),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight - AppSpacing.page * 2),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    FadeTransition(
-                      opacity: _logoFade,
-                      child: ScaleTransition(
-                        scale: _logoScale,
-                        child: const AppLogo(size: 96),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: AppColors.primary,
+      ),
+      child: Scaffold(
+        backgroundColor: AppColors.primary,
+        body: AnimatedBuilder(
+          animation: _ctrl,
+          builder: (context, _) {
+            final size = MediaQuery.sizeOf(context);
+            final lift = -size.height * 0.07 * _lift.value;
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                // Background: solid indigo → hero gradient.
+                Opacity(
+                  opacity: _bg.value,
+                  child: const DecoratedBox(
+                    decoration: BoxDecoration(gradient: AppColors.heroGradient),
+                  ),
+                ),
+                // Soft decorative glows.
+                Positioned(
+                  top: -size.width * 0.35,
+                  right: -size.width * 0.3,
+                  child: _Glow(size: size.width * 0.9, opacity: 0.10 * _bg.value),
+                ),
+                Positioned(
+                  bottom: -size.width * 0.4,
+                  left: -size.width * 0.35,
+                  child: _Glow(size: size.width, opacity: 0.08 * _bg.value),
+                ),
+                // Mark + tile, centred exactly like the native splash.
+                Center(
+                  child: Transform.translate(
+                    offset: Offset(0, lift),
+                    child: SizedBox(
+                      width: 140,
+                      height: 140,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Transform.scale(
+                            scale: 0.4 + 0.6 * _tile.value,
+                            child: Opacity(
+                              opacity: _tile.value.clamp(0.0, 1.0),
+                              child: Container(
+                                width: 112,
+                                height: 112,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.16),
+                                  borderRadius: BorderRadius.circular(34),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.28),
+                                    width: 1.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.18),
+                                      blurRadius: 30,
+                                      offset: const Offset(0, 14),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Same artwork + size as the native launch drawable.
+                          const AppLogo(
+                            size: 108,
+                            foregroundOnly: true,
+                            withShadow: false,
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.xxl),
-                    FadeTransition(
-                      opacity: _textFade,
-                      child: SlideTransition(
-                        position: _textSlide,
+                  ),
+                ),
+                // Wordmark, tagline and loader / error.
+                Align(
+                  alignment: Alignment.center,
+                  child: Transform.translate(
+                    offset: Offset(0, lift + 120 + 24 * (1 - _text.value)),
+                    child: Opacity(
+                      opacity: _text.value,
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: AppSpacing.page),
                         child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('SplitShare',
-                                style: theme.textTheme.displaySmall),
+                            const Text(
+                              'SplitShare',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 36,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -1,
+                              ),
+                            ),
                             const SizedBox(height: AppSpacing.sm),
                             Text(
                               'Split bills. Stay friends.',
                               textAlign: TextAlign.center,
-                              style: theme.textTheme.bodyLarge
-                                  ?.copyWith(color: AppColors.textSecondary),
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xxxl),
+                            AnimatedSwitcher(
+                              duration: AppMotion.normal,
+                              child: _error == null
+                                  ? const _LoadingDots(key: ValueKey('loading'))
+                                  : _ErrorBlock(
+                                      key: const ValueKey('error'),
+                                      retrying: _retrying,
+                                      onRetry: _retry,
+                                    ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.xxxl),
-                    AnimatedSwitcher(
-                      duration: AppMotion.normal,
-                      child: _error == null
-                          ? const SizedBox(
-                              key: ValueKey('loading'),
-                              width: 26,
-                              height: 26,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2.6, color: AppColors.primary),
-                            )
-                          : _ErrorBlock(
-                              key: const ValueKey('error'),
-                              retrying: _retrying,
-                              onRetry: _retry,
-                            ),
-                    ),
-                  ],
+                  ),
                 ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _Glow extends StatelessWidget {
+  final double size;
+  final double opacity;
+  const _Glow({required this.size, required this.opacity});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [
+            Colors.white.withValues(alpha: opacity),
+            Colors.white.withValues(alpha: 0),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Three gently pulsing dots.
+class _LoadingDots extends StatefulWidget {
+  const _LoadingDots({super.key});
+
+  @override
+  State<_LoadingDots> createState() => _LoadingDotsState();
+}
+
+class _LoadingDotsState extends State<_LoadingDots>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 12,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, _) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (i) {
+            final phase = (_c.value - i * 0.18) % 1.0;
+            final t = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.35 + 0.65 * t),
               ),
-            ),
-          ),
+            );
+          }),
         ),
       ),
     );
@@ -198,13 +364,15 @@ class _ErrorBlock extends StatelessWidget {
     return AppCard(
       padding: const EdgeInsets.all(AppSpacing.xl),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           const IconBadge(icon: Icons.cloud_off_rounded, color: AppColors.error),
           const SizedBox(height: AppSpacing.md),
           Text("Couldn't connect", style: theme.textTheme.titleMedium),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'SplitShare could not start its services. Check your internet connection and try again.',
+            'SplitShare could not start its services. Check your internet '
+            'connection and try again.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium,
           ),

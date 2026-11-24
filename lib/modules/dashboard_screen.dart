@@ -7,6 +7,7 @@ import '../controllers/group_controller.dart';
 import '../controllers/notification_controller.dart';
 import '../controllers/profile_controller.dart';
 import '../controllers/shell_controller.dart';
+import '../controllers/trip_controller.dart';
 import '../core/ui.dart';
 import 'widgets/expense_tile.dart';
 
@@ -167,6 +168,7 @@ class _DashboardContent extends StatelessWidget {
       children: [
         FadeSlideIn(index: 1, child: _HeroBalanceCard()),
         FadeSlideIn(index: 2, child: _QuickActions()),
+        FadeSlideIn(index: 3, child: _TripSplitBanner()),
         FadeSlideIn(index: 3, child: _MonthInsight()),
         FadeSlideIn(index: 4, child: _BalancesSection()),
         FadeSlideIn(index: 5, child: _RecentActivitySection()),
@@ -1105,6 +1107,7 @@ class _NewUserContent extends StatelessWidget {
           ),
         ),
         const FadeSlideIn(index: 2, child: _QuickActions()),
+        const FadeSlideIn(index: 3, child: _TripSplitBanner()),
         const FadeSlideIn(index: 3, child: _GetStartedCard()),
       ],
     );
@@ -1328,6 +1331,78 @@ class _DashboardSkeleton extends StatelessWidget {
             padding: EdgeInsets.zero,
           ),
         ],
+      ),
+    );
+  }
+}
+
+
+/// Entry to "Trip Split": log who paid on a trip / day out and get the
+/// fewest "X pays Y" transfers.
+class _TripSplitBanner extends StatelessWidget {
+  const _TripSplitBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.page, AppSpacing.lg, AppSpacing.page, 0),
+      child: AppCard(
+        onTap: () => Get.toNamed(AppRoutes.trips),
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Row(
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.accent, AppColors.primary],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(Icons.luggage_rounded, color: Colors.white, size: 26),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Obx(() {
+                final trips = TripController.to.trips;
+                final open = trips.where((t) => t.plan.isNotEmpty).length;
+                final subtitle = trips.isEmpty
+                    ? 'Log who paid on a trip and see who owes whom'
+                    : open == 0
+                        ? '${trips.length} ${trips.length == 1 ? 'trip' : 'trips'} · all settled'
+                        : '$open ${open == 1 ? 'trip has' : 'trips have'} people to pay back';
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Trip Split',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                );
+              }),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+          ],
+        ),
       ),
     );
   }

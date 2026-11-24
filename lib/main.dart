@@ -10,6 +10,7 @@ import 'controllers/group_controller.dart';
 import 'controllers/notification_controller.dart';
 import 'controllers/profile_controller.dart';
 import 'controllers/shell_controller.dart';
+import 'controllers/trip_controller.dart';
 import 'core/ui.dart';
 import 'firebase_options.dart';
 
@@ -45,6 +46,7 @@ void registerControllers() {
   Get.put(GroupController(), permanent: true);
   Get.put(NotificationController(), permanent: true);
   Get.put(ShellController(), permanent: true);
+  Get.put(TripController(), permanent: true);
 }
 
 class SplitShareApp extends StatelessWidget {

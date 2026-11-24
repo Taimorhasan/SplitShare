@@ -32,6 +32,8 @@ class AppRoutes {
   static const String editProfile = '/edit-profile';
   static const String changePassword = '/change-password';
   static const String help = '/help';
+  static const String trips = '/trips';
+  static const String tripDetail = '/trip';
 }
 
 /// Alias kept for backward compatibility.

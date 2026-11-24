@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:splitshare/controllers/expense_controller.dart';
+import 'package:splitshare/controllers/trip_controller.dart';
 import 'package:splitshare/core/ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
@@ -96,6 +97,80 @@ void main() {
 
     test('pairKey is order independent', () {
       expect(ExpenseController.pairKey('x', 'y'), ExpenseController.pairKey('y', 'x'));
+    });
+  });
+
+  group('TripMath', () {
+    TripPerson p(String id) => TripPerson(id: id, name: id);
+    TripPayment pay(String who, double amount) => TripPayment(
+          id: '$who$amount',
+          personId: who,
+          cents: TripMath.toCents(amount),
+          at: DateTime(2026),
+        );
+
+    // The user's real example: four friends pay different amounts.
+    final people = [p('Ahad'), p('Ali'), p('Usman'), p('Taimoor')];
+    final payments = [
+      pay('Ahad', 8000),
+      pay('Ali', 7500),
+      pay('Usman', 890),
+      pay('Taimoor', 500),
+    ];
+
+    test('equal shares and balances add up to zero', () {
+      final s = TripMath.summarise(people, payments, const []);
+      expect(s.map((x) => x.shareCents).fold<int>(0, (a, b) => a + b), 1689000);
+      expect(s.map((x) => x.balanceCents).fold<int>(0, (a, b) => a + b), 0);
+      final byName = {for (final x in s) x.person.id: x.balanceCents};
+      expect(byName['Ahad'], 377750); // +3,777.50
+      expect(byName['Ali'], 327750); // +3,277.50
+      expect(byName['Usman'], -333250); // -3,332.50
+      expect(byName['Taimoor'], -372250); // -3,722.50
+    });
+
+    test('settle plan uses at most n-1 transfers and clears every balance', () {
+      final plan = TripMath.settlePlan(TripMath.summarise(people, payments, const []));
+      expect(plan.length, lessThanOrEqualTo(3));
+      final net = <String, int>{};
+      for (final t in plan) {
+        net[t.fromId] = (net[t.fromId] ?? 0) + t.cents;
+        net[t.toId] = (net[t.toId] ?? 0) - t.cents;
+      }
+      expect(net['Taimoor'], 372250);
+      expect(net['Usman'], 333250);
+      expect(net['Ahad'], -377750);
+      expect(net['Ali'], -327750);
+    });
+
+    test('marking transfers as paid settles the trip', () {
+      final plan = TripMath.settlePlan(TripMath.summarise(people, payments, const []));
+      final settlements = [
+        for (final t in plan)
+          TripSettlement(
+            id: t.toString(),
+            fromId: t.fromId,
+            toId: t.toId,
+            cents: t.cents,
+            at: DateTime(2026),
+          ),
+      ];
+      final after = TripMath.summarise(people, payments, settlements);
+      expect(after.every((x) => x.balanceCents == 0), isTrue);
+      expect(TripMath.settlePlan(after), isEmpty);
+    });
+
+    test('odd totals still split to the cent', () {
+      final shares = TripMath.equalShares(1000, 3);
+      expect(shares.fold<int>(0, (a, b) => a + b), 1000);
+    });
+  });
+
+  group('Full-amount split', () {
+    test('payer is owed everything', () {
+      final e = expense(payer: 'me', splits: {'me': 0, 'a': 50});
+      expect(ExpenseController.netForExpense(e, 'me'), {'a': 50});
+      expect(ExpenseController.netForExpense(e, 'a'), {'me': -50});
     });
   });
 

@@ -20,6 +20,8 @@ import '../../modules/scan_qr_screen.dart';
 import '../../modules/settle_up_screen.dart';
 import '../../modules/signup_screen.dart';
 import '../../modules/splash_screen.dart';
+import '../../modules/trip_detail_screen.dart';
+import '../../modules/trips_screen.dart';
 import 'app_routes.dart';
 
 /// Route table.
@@ -74,5 +76,7 @@ class AppPages {
     GetPage(name: AppRoutes.editProfile, page: () => const EditProfileScreen()),
     GetPage(name: AppRoutes.changePassword, page: () => const ChangePasswordScreen()),
     GetPage(name: AppRoutes.help, page: () => const HelpScreen()),
+    GetPage(name: AppRoutes.trips, page: () => const TripsScreen()),
+    GetPage(name: AppRoutes.tripDetail, page: () => const TripDetailScreen()),
   ];
 }

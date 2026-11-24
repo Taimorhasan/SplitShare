@@ -26,7 +26,7 @@ class ExpenseValidationException implements Exception {
 /// amount, description, category, date, notes, currencyCode,
 /// type: 'expense' | 'payment',
 /// paidBy: {uid, name},
-/// splitType: 'Equally' | 'Percent' | 'Exact',
+/// splitType: 'Equally' | 'Percent' | 'Exact' | 'Full' (payer owes nothing),
 /// individualSplits: {uid: amountOwed},   // includes the payer's own share
 /// involvedUsers: [uid],                  // used for queries + security rules
 /// participantNames: {uid: name},
@@ -638,6 +638,16 @@ class ExpenseController extends GetxController {
         for (final u in participants)
           u: double.parse((splitValuesByUid[u] ?? 0).toStringAsFixed(2)),
       };
+    } else if (splitType == 'Full') {
+      // No split: the payer covered it for the others, who owe the full
+      // amount (shared equally if there are several of them).
+      final owers = participants.where((u) => u != payerUid).toList();
+      if (owers.isEmpty) {
+        throw ExpenseValidationException(
+            'Add the person who owes this amount');
+      }
+      splits = distribute(amount, owers, List.filled(owers.length, 1.0));
+      splits[payerUid] = 0.0;
     } else {
       // Equally between everyone selected (payer included only if selected,
       // or if the payer is me — "I paid and split with X" means both share).

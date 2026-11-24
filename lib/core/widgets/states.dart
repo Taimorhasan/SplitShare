@@ -31,13 +31,28 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(
+    // Inside a ListView / scrollable the height is unbounded: a nested
+    // scroll view there is a layout error (blank white screen in release),
+    // so only wrap in a scroll view when the height is bounded.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const padding = EdgeInsets.symmetric(
           horizontal: AppSpacing.xxxl,
           vertical: AppSpacing.xxl,
-        ),
-        child: Column(
+        );
+        final content = _content(context);
+        if (!constraints.hasBoundedHeight) {
+          return Padding(padding: padding, child: content);
+        }
+        return Center(
+          child: SingleChildScrollView(padding: padding, child: content),
+        );
+      },
+    );
+  }
+
+  Widget _content(BuildContext context) {
+    return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             AppIllustration(
@@ -69,9 +84,7 @@ class EmptyState extends StatelessWidget {
               ),
             ],
           ],
-        ),
-      ),
-    );
+        );
   }
 }
 

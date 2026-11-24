@@ -323,6 +323,7 @@ class _DetailBody extends StatelessWidget {
   static String _splitLabel(String? type) => switch (type) {
         'Percent' => 'by percentage',
         'Exact' => 'by exact amounts',
+        'Full' => '— full amount owed',
         _ => 'equally',
       };
 

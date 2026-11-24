@@ -50,7 +50,9 @@ const _sections = <_FaqSection>[
       'Equally divides the amount evenly between everyone involved. Percent '
           'lets you give each person a percentage — the percentages must add '
           'up to 100%. Exact lets you enter each person\'s amount — the '
-          'amounts must add up to the total.',
+          'amounts must add up to the total. Full amount means no split: '
+          'whoever paid is owed the whole amount (for example, you paid for '
+          "a friend's ticket).",
     ),
     _Faq(
       'Who can edit or delete an expense?',

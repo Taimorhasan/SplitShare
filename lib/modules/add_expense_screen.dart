@@ -13,7 +13,8 @@ import '../controllers/profile_controller.dart';
 import '../controllers/shell_controller.dart';
 import '../core/ui.dart';
 
-const _splitTypes = ['Equally', 'Percent', 'Exact'];
+/// 'Full' = no split: whoever paid is owed the whole amount.
+const _splitTypes = ['Equally', 'Percent', 'Exact', 'Full'];
 
 /// Add / edit an expense.
 ///
@@ -301,7 +302,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         _people.map((p) => p['uid']).join(','),
         _payerUid,
         _splitType,
-        if (_splitType != 'Equally')
+        if (_splitType == 'Percent' || _splitType == 'Exact')
           _everyone.map((u) => _ctrlFor(u).text.trim()).join(','),
         _receipt?.path ?? '',
         '$_removeExistingReceipt',
@@ -560,7 +561,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         'uid': _payerUid,
         'name': _payerUid == _me ? 'You' : _nameOf(_payerUid),
       };
-      final values = _splitType == 'Equally'
+      final values = (_splitType == 'Equally' || _splitType == 'Full')
           ? <String, double>{}
           : {for (final u in _everyone) u: _valueOf(u)};
       final splitWith = _people
@@ -1005,6 +1006,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                         switch (type) {
                           'Percent' => Icons.percent_rounded,
                           'Exact' => Icons.tune_rounded,
+                          'Full' => Icons.east_rounded,
                           _ => Icons.drag_handle_rounded,
                         },
                         size: 16,
@@ -1013,7 +1015,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          type == 'Equally' ? 'Equally' : type,
+                          type,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -1035,9 +1037,83 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     );
   }
 
+  /// "Full amount": the payer is owed everything; nobody else's share is
+  /// deducted from the payer.
+  Widget _fullAmountDetails(List<String> uids, double? amount) {
+    final owers = uids.where((u) => u != _payerUid).toList();
+    final shares = (amount == null || owers.isEmpty)
+        ? null
+        : _distribute((amount * 100).round(), owers.length);
+    final payerName = _payerUid == _me ? 'You' : _nameOf(_payerUid);
+    final String headline;
+    if (owers.isEmpty) {
+      headline = 'Add the person who owes this amount';
+    } else if (owers.length == 1) {
+      final who = owers.first == _me ? 'You owe' : '${_nameOf(owers.first)} owes';
+      headline = '$who ${payerName == 'You' ? 'you' : payerName} the full amount';
+    } else {
+      headline = '$payerName paid — the others owe the full amount';
+    }
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const IconBadge(
+                icon: Icons.east_rounded,
+                color: AppColors.positive,
+                size: 30,
+                iconSize: 16,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  headline,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            "No split — the payer's own share is zero.",
+            style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 4),
+          for (var i = 0; i < owers.length; i++)
+            _ShareRow(
+              name: _nameOf(owers[i]),
+              avatarName: owers[i] == _me
+                  ? ProfileController.to.name.value
+                  : _nameOf(owers[i]),
+              avatarUrl: _avatarOf(owers[i]),
+              trailing: Text(
+                shares == null
+                    ? '—'
+                    : Fmt.money(shares[i] / 100, currencyCode: _currency),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _splitDetails() {
     final uids = _everyone;
     final amount = _amount;
+
+    if (_splitType == 'Full') return _fullAmountDetails(uids, amount);
 
     if (_splitType == 'Equally') {
       final shares = amount == null
