@@ -115,7 +115,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               'You signed in with $_providerName, so there\'s no SplitShare '
               'password to change. Manage your password and security in your '
               '$_providerName account.',
-          color: AppColors.secondary,
           actionLabel: 'Go back',
           actionIcon: Icons.arrow_back_rounded,
           onAction: () => Navigator.of(context).maybePop(),
@@ -153,8 +152,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   child: AppIllustration(
                     icon: Icons.lock_rounded,
                     badgeIcon: Icons.key_rounded,
-                    size: 150,
-                    orbitIcons: [Icons.shield_outlined, Icons.password_rounded],
+                    size: 140,
                   ),
                 ),
               ),
@@ -356,10 +354,10 @@ class _Requirement extends StatelessWidget {
               duration: AppMotion.normal,
               curve: Curves.easeOutBack,
               scale: met ? 1 : 0,
-              child: const Icon(
+              child: Icon(
                 Icons.check_rounded,
                 size: 14,
-                color: Colors.white,
+                color: AppColors.onPrimary,
               ),
             ),
           ),

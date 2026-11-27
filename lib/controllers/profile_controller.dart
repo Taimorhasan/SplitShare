@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
 import '../core/formatters.dart';
+import '../core/image_store.dart';
 import 'auth_controller.dart';
 
 /// The signed-in user's profile.
@@ -115,17 +115,11 @@ class ProfileController extends GetxController {
     );
   }
 
-  /// Uploads an avatar image and returns its download URL.
+  /// Saves a profile photo (free Firestore image store) and returns its URL.
   Future<String> uploadAvatar(File file) async {
     final uid = _uid;
     if (uid == null) throw Exception('Not signed in');
-    final ref = FirebaseStorage.instance.ref('avatars/$uid.jpg');
-    await ref
-        .putFile(file, SettableMetadata(contentType: 'image/jpeg'))
-        .timeout(const Duration(seconds: 60));
-    final url = await ref.getDownloadURL();
-    // Bust caches: same path, new token each upload.
-    return url;
+    return ImageStore.saveAvatar(uid, await file.readAsBytes());
   }
 
   /// Updates the profile and propagates name/avatar to friends' and groups'

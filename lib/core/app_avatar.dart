@@ -1,7 +1,7 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'formatters.dart';
+import 'widgets/app_image.dart';
 
 /// User avatar: network photo with cached loading, falling back to coloured
 /// initials derived from the name (stable colour per person).
@@ -33,16 +33,12 @@ class AppAvatar extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [color, Color.lerp(color, Colors.black, 0.18)!],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: color.withValues(alpha: AppColors.isDark ? 0.22 : 0.12),
       ),
       child: Text(
         Fmt.initials(name),
         style: TextStyle(
-          color: Colors.white,
+          color: color,
           fontWeight: FontWeight.w700,
           fontSize: radius * 0.72,
           letterSpacing: 0.3,
@@ -50,17 +46,15 @@ class AppAvatar extends StatelessWidget {
       ),
     );
 
-    final Widget avatar = url.startsWith('http')
+    final Widget avatar = AppImage.canShow(url)
         ? ClipOval(
-            child: CachedNetworkImage(
-              imageUrl: url,
+            child: AppImage(
+              url: url,
               width: size,
               height: size,
-              fit: BoxFit.cover,
               memCacheWidth: (size * 2.5).round(),
-              fadeInDuration: const Duration(milliseconds: 200),
-              placeholder: (_, _) => initials,
-              errorWidget: (_, _, _) => initials,
+              placeholder: initials,
+              error: initials,
             ),
           )
         : initials;
@@ -69,9 +63,9 @@ class AppAvatar extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(2.5),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white,
+        color: AppColors.surface,
       ),
       child: avatar,
     );
@@ -124,7 +118,7 @@ class AvatarStack extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.primaryLight,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2.5),
+                  border: Border.all(color: AppColors.surface, width: 2.5),
                 ),
                 alignment: Alignment.center,
                 child: Text(

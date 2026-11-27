@@ -3,7 +3,8 @@ import 'package:get/get.dart';
 import '../controllers/expense_controller.dart';
 import '../controllers/shell_controller.dart';
 import '../core/ui.dart';
-import 'widgets/expense_tile.dart';
+import '../controllers/trip_controller.dart';
+import 'widgets/history.dart';
 
 enum _ActivityFilter { all, expenses, payments, youOwe, youreOwed }
 
@@ -17,7 +18,8 @@ extension on _ActivityFilter {
       };
 }
 
-/// Full, searchable, paginated activity feed.
+/// Full, searchable history: expenses, payments and group payments /
+/// pay-backs, newest first. Expense pages load as you scroll.
 class ActivityScreen extends StatefulWidget {
   const ActivityScreen({super.key});
 
@@ -71,55 +73,29 @@ class _ActivityScreenState extends State<ActivityScreen> {
     });
   }
 
-  bool _matches(Map<String, dynamic> e) {
-    final isPayment = ExpenseController.isPayment(e);
+  bool _matches(HistoryEntry e) {
     switch (_filter) {
       case _ActivityFilter.all:
         break;
       case _ActivityFilter.expenses:
-        if (isPayment) return false;
+        if (e.isPayment) return false;
       case _ActivityFilter.payments:
-        if (!isPayment) return false;
+        if (!e.isPayment) return false;
       case _ActivityFilter.youOwe:
-        if (isPayment || _ec.myNetOn(e) > -0.005) return false;
+        if (e.isPayment || e.myEffect > -0.005) return false;
       case _ActivityFilter.youreOwed:
-        if (isPayment || _ec.myNetOn(e) < 0.005) return false;
+        if (e.isPayment || e.myEffect < 0.005) return false;
     }
     final q = _query.trim().toLowerCase();
     if (q.isEmpty) return true;
-    final payerUid = ExpenseController.payerOf(e);
-    final paidBy = e['paidBy'];
-    final payerName =
-        (paidBy is Map ? paidBy['name'] : null)?.toString() ?? _ec.nameFor(payerUid);
-    final haystack = [
-      e['description'],
-      payerName,
-      _ec.nameFor(payerUid),
-      isPayment ? 'payment' : e['category'],
-    ].whereType<Object>().map((s) => s.toString().toLowerCase());
-    return haystack.any((s) => s.contains(q));
-  }
-
-  /// Flattens the filtered list into section labels + expense rows.
-  List<Object> _rows(List<Map<String, dynamic>> source) {
-    final rows = <Object>[];
-    String? current;
-    for (final e in source) {
-      if (!_matches(e)) continue;
-      final label = Fmt.dayGroup(e['createdAt'] ?? e['date']);
-      if (label != current) {
-        rows.add(label);
-        current = label;
-      }
-      rows.add(e);
-    }
-    return rows;
+    return e.title.toLowerCase().contains(q) ||
+        e.subtitle.toLowerCase().contains(q);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const AppTopBar(title: 'Activity'),
+      appBar: const AppTopBar(title: 'History'),
       body: GestureDetector(
         onTap: AppNav.unfocus,
         behavior: HitTestBehavior.translucent,
@@ -134,7 +110,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
               ),
               child: AppSearchField(
                 controller: _search,
-                hint: 'Search description, person or category',
+                hint: 'Search description, person, group or category',
                 onChanged: (v) => setState(() => _query = v),
               ),
             ),
@@ -170,7 +146,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 
   Widget _buildBody() {
-    final all = _ec.recentActivity.toList();
+    _ec.recentActivity.length;
+    TripController.to.trips.length;
+    final all = buildHistory();
     final loading = _ec.isLoading.value;
     final error = _ec.hasError.value;
     final hasMore = _ec.hasMoreActivity.value;
@@ -198,9 +176,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
         key: const ValueKey('empty'),
         child: EmptyState(
           icon: Icons.receipt_long_rounded,
-          title: 'No activity yet',
-          message:
-              'Expenses and payments you\'re part of will show up here.',
+          title: 'No history yet',
+          message: 'Expenses, payments and group payments you\'re part of '
+              'will show up here.',
           actionLabel: 'Add expense',
           actionIcon: Icons.add_rounded,
           onAction: () => AppNav.addExpense(),
@@ -212,7 +190,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
         ),
       );
     } else {
-      final rows = _rows(all);
+      final rows = all.where(_matches).toList();
       if (rows.isEmpty && !hasMore) {
         child = _FillScroll(
           key: const ValueKey('no-results'),
@@ -238,38 +216,23 @@ class _ActivityScreenState extends State<ActivityScreen> {
             if (pos.maxScrollExtent <= 400) _loadMore();
           });
         }
-        child = ListView.builder(
+        child = ListView(
           key: const ValueKey('list'),
           controller: _scroll,
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.page,
-            AppSpacing.xs,
+            AppSpacing.sm,
             AppSpacing.page,
             AppSpacing.xxxl,
           ),
-          itemCount: rows.length + 1,
-          itemBuilder: (context, i) {
-            if (i == rows.length) {
-              return _ListFooter(
-                loadingMore: loadingMore || (hasMore && rows.isEmpty),
-                hasMore: hasMore,
-              );
-            }
-            final row = rows[i];
-            if (row is String) {
-              return _SectionLabel(label: row, first: i == 0);
-            }
-            final e = row as Map<String, dynamic>;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md - 2),
-              child: FadeSlideIn(
-                key: ValueKey(e['id']),
-                index: i.clamp(0, 8),
-                child: ExpenseTile(expense: e),
-              ),
-            );
-          },
+          children: [
+            HistoryList(rows),
+            _ListFooter(
+              loadingMore: loadingMore || (hasMore && rows.isEmpty),
+              hasMore: hasMore,
+            ),
+          ],
         );
       }
     }
@@ -305,56 +268,16 @@ class _FilterChip extends StatelessWidget {
             border: Border.all(
               color: selected ? AppColors.primary : AppColors.border,
             ),
-            boxShadow: selected ? AppShadows.glow(AppColors.primary) : null,
           ),
           child: Text(
             label,
             style: TextStyle(
               fontSize: 13.5,
               fontWeight: FontWeight.w600,
-              color: selected ? Colors.white : AppColors.textPrimary,
+              color: selected ? AppColors.onPrimary : AppColors.textPrimary,
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String label;
-  final bool first;
-
-  const _SectionLabel({required this.label, required this.first});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        top: first ? AppSpacing.sm : AppSpacing.lg,
-        bottom: AppSpacing.sm + 2,
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceMuted,
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-            ),
-            child: Text(
-              label.toUpperCase(),
-              style: const TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          const Expanded(child: Divider(color: AppColors.border, height: 1)),
-        ],
       ),
     );
   }
@@ -380,13 +303,11 @@ class _ListFooter extends StatelessWidget {
         ),
       );
     }
-    return const Padding(
+    return Padding(
       padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.check_circle_rounded, size: 18, color: AppColors.positive),
-          SizedBox(width: AppSpacing.sm),
           Text(
             'You\'re all caught up',
             style: TextStyle(

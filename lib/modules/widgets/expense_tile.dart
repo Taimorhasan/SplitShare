@@ -7,13 +7,20 @@ import '../../core/ui.dart';
 /// group detail, friend detail). Tapping opens the expense detail screen.
 ///
 /// Right side shows the current user's position on that expense:
-/// "you lent $5" (green), "you borrowed $5" (rose), "settled" or
+/// "you lent $5" (ink), "you borrowed $5" (red), "settled" or
 /// "not involved".
+///
+/// Prefer `card: false` with the rows inside one [AppCard] (or straight on
+/// the page) separated by dividers. `card: true` draws a single
+/// hairline-ruled block for a lone row.
 class ExpenseTile extends StatelessWidget {
   final Map<String, dynamic> expense;
   final VoidCallback? onTap;
   final bool showDate;
   final bool card;
+
+  /// Row padding when [card] is false.
+  final EdgeInsetsGeometry padding;
 
   const ExpenseTile({
     super.key,
@@ -21,6 +28,10 @@ class ExpenseTile extends StatelessWidget {
     this.onTap,
     this.showDate = true,
     this.card = true,
+    this.padding = const EdgeInsets.symmetric(
+      horizontal: AppSpacing.lg,
+      vertical: AppSpacing.md,
+    ),
   });
 
   @override
@@ -91,8 +102,8 @@ class ExpenseTile extends StatelessWidget {
 
     final row = Row(
       children: [
-        IconBadge(icon: style.icon, color: style.color, size: 46, iconSize: 22),
-        const SizedBox(width: 14),
+        IconBadge(icon: style.icon, color: style.color, size: 40, iconSize: 20),
+        const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -101,7 +112,7 @@ class ExpenseTile extends StatelessWidget {
                 (expense['description'] ?? 'Expense').toString(),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -112,7 +123,7 @@ class ExpenseTile extends StatelessWidget {
                 subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12.5,
                   color: AppColors.textSecondary,
                 ),
@@ -127,9 +138,9 @@ class ExpenseTile extends StatelessWidget {
             Text(
               rightCaption,
               style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: rightColor.withValues(alpha: 0.85),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: rightColor,
               ),
             ),
             if (rightAmount != null) ...[
@@ -155,18 +166,20 @@ class ExpenseTile extends StatelessWidget {
         };
 
     if (!card) {
-      return InkWell(
-        onTap: tap,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-          child: row,
+      return Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: tap,
+          child: Padding(padding: padding, child: row),
         ),
       );
     }
     return AppCard(
       onTap: tap,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md + 2,
+      ),
       child: row,
     );
   }

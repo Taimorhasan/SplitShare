@@ -88,14 +88,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   bool get _hasPhoto =>
       _pickedImage != null ||
-      (!_removePhoto && _profile.avatarUrl.value.startsWith('http'));
+      (!_removePhoto && AppImage.canShow(_profile.avatarUrl.value));
 
   Future<void> _pick(ImageSource source) async {
     try {
       final file = await _picker.pickImage(
         source: source,
-        imageQuality: 75,
-        maxWidth: 800,
+        // Small enough for the free Firestore image store (~30–60 KB).
+        imageQuality: 70,
+        maxWidth: 480,
+        maxHeight: 480,
       );
       if (file == null || !mounted) return;
       setState(() {
@@ -136,7 +138,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 AppListTile(
                   icon: Icons.photo_library_outlined,
-                  iconColor: AppColors.secondary,
                   title: 'Choose from gallery',
                   showChevron: false,
                   onTap: () => choose(() => _pick(ImageSource.gallery)),
@@ -276,7 +277,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             label: 'Email',
                             prefixIcon: Icons.mail_outline_rounded,
                             readOnly: true,
-                            suffix: const Icon(
+                            suffix: Icon(
                               Icons.lock_outline_rounded,
                               size: 18,
                               color: AppColors.textMuted,
@@ -330,11 +331,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           clipBehavior: Clip.none,
           children: [
             Container(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
-                gradient: AppColors.brandGradient,
                 shape: BoxShape.circle,
-                boxShadow: AppShadows.glow(AppColors.primary),
+                border: Border.all(color: AppColors.border, width: 1.2),
               ),
               child: AnimatedSwitcher(
                 duration: AppMotion.normal,
@@ -342,7 +342,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ? Container(
                         key: ValueKey(_pickedImage!.path),
                         padding: const EdgeInsets.all(2.5),
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           color: AppColors.surface,
                           shape: BoxShape.circle,
                         ),
@@ -377,11 +377,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.primary,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.surface, width: 3),
+                  border: Border.all(color: AppColors.background, width: 3),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.photo_camera_rounded,
-                  color: Colors.white,
+                  color: AppColors.onPrimary,
                   size: 18,
                 ),
               ),

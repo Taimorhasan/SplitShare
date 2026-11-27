@@ -134,28 +134,37 @@ class _ScanQrScreenState extends State<ScanQrScreen>
                             left: AppSpacing.page,
                             right: AppSpacing.page,
                             top: window.bottom + AppSpacing.xxl,
-                            child: const Column(
-                              children: [
-                                Text(
-                                  'Scan a friend\'s code',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                            child: Container(
+                              padding: const EdgeInsets.all(AppSpacing.lg),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface,
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.lg,
                                 ),
-                                SizedBox(height: 6),
-                                Text(
-                                  'Point your camera at the QR code in their SplitShare app (Add friends → My QR code).',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 13.5,
-                                    height: 1.4,
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    'Scan a friend\'s code',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Point your camera at the QR code in their SplitShare app (Add friends → My QR code).',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 13.5,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -175,17 +184,7 @@ class _ScanQrScreenState extends State<ScanQrScreen>
                             tooltip: 'Close',
                             onTap: _close,
                           ),
-                          const Expanded(
-                            child: Text(
-                              'Scan QR code',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
+                          const Spacer(),
                           if (state.torchState == TorchState.unavailable)
                             const SizedBox(width: 44)
                           else
@@ -237,12 +236,12 @@ class _GlassButton extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: active ? Colors.white : Colors.white.withValues(alpha: 0.16),
+            color: active ? AppColors.surface : AppColors.primary,
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: Icon(
             icon,
-            color: active ? AppColors.textPrimary : Colors.white,
+            color: active ? AppColors.primary : AppColors.onPrimary,
           ),
         ),
       ),
@@ -312,36 +311,13 @@ class _ScanOverlayPainter extends CustomPainter {
     final y = window.top + 18 + (window.height - 36) * progress;
     final lineRect = Rect.fromLTWH(
       window.left + 18,
-      y - 1.5,
+      y - 1,
       window.width - 36,
-      3,
+      2,
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(lineRect, const Radius.circular(2)),
-      Paint()
-        ..shader = LinearGradient(
-          colors: [
-            AppColors.accent.withValues(alpha: 0),
-            AppColors.accent,
-            AppColors.accent.withValues(alpha: 0),
-          ],
-        ).createShader(lineRect),
-    );
-    final glowRect = Rect.fromLTWH(
-      window.left + 18,
-      y - 14,
-      window.width - 36,
-      28,
-    );
-    canvas.drawRect(
-      glowRect,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            AppColors.accent.withValues(alpha: 0.22),
-            AppColors.accent.withValues(alpha: 0),
-          ],
-        ).createShader(glowRect),
+      Paint()..color = AppColors.rule,
     );
   }
 

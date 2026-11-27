@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 
 /// Visual metadata for a category / group type.
+///
+/// Colours are muted pen inks (the khata world): one shade for the white
+/// page and a lighter one for the night page.
 class CategoryStyle {
   final String name;
   final IconData icon;
-  final Color color;
-  const CategoryStyle(this.name, this.icon, this.color);
+  final Color light;
+  final Color dark;
+  const CategoryStyle(this.name, this.icon, this.light, this.dark);
 
-  Color get tint => color.withValues(alpha: 0.12);
+  Color get color => AppColors.isDark ? dark : light;
+  Color get tint => color.withValues(alpha: AppColors.isDark ? 0.20 : 0.10);
 }
 
 /// Expense categories. Names are persisted in Firestore (`expenses.category`),
@@ -16,21 +22,21 @@ class ExpenseCategories {
   ExpenseCategories._();
 
   static const List<CategoryStyle> all = [
-    CategoryStyle('Food', Icons.restaurant_rounded, Color(0xFFF97316)),
-    CategoryStyle('Groceries', Icons.local_grocery_store_rounded, Color(0xFF22C55E)),
-    CategoryStyle('Travel', Icons.flight_takeoff_rounded, Color(0xFF0EA5E9)),
-    CategoryStyle('Transport', Icons.directions_car_rounded, Color(0xFF3B82F6)),
-    CategoryStyle('Bills', Icons.bolt_rounded, Color(0xFFF59E0B)),
-    CategoryStyle('Rent', Icons.home_rounded, Color(0xFF8B5CF6)),
-    CategoryStyle('Shopping', Icons.shopping_bag_rounded, Color(0xFFEC4899)),
-    CategoryStyle('Entertainment', Icons.movie_rounded, Color(0xFFE11D48)),
-    CategoryStyle('Health', Icons.favorite_rounded, Color(0xFF14B8A6)),
-    CategoryStyle('Other', Icons.category_rounded, Color(0xFF64748B)),
+    CategoryStyle('Food', Icons.restaurant_rounded, Color(0xFFA4521A), Color(0xFFE3965E)),
+    CategoryStyle('Groceries', Icons.local_grocery_store_rounded, Color(0xFF2E6B4F), Color(0xFF6FC49B)),
+    CategoryStyle('Travel', Icons.flight_takeoff_rounded, Color(0xFF1D5E8C), Color(0xFF7FB6E0)),
+    CategoryStyle('Transport', Icons.directions_car_rounded, Color(0xFF2F4A9E), Color(0xFF9CB0FF)),
+    CategoryStyle('Bills', Icons.bolt_rounded, Color(0xFF8A5A00), Color(0xFFD9A54A)),
+    CategoryStyle('Rent', Icons.home_rounded, Color(0xFF5B3A8E), Color(0xFFB394EA)),
+    CategoryStyle('Shopping', Icons.shopping_bag_rounded, Color(0xFF8E2F5F), Color(0xFFE07FAA)),
+    CategoryStyle('Entertainment', Icons.movie_rounded, Color(0xFFA12B2B), Color(0xFFF07A72)),
+    CategoryStyle('Health', Icons.favorite_rounded, Color(0xFF00707A), Color(0xFF52C2CC)),
+    CategoryStyle('Other', Icons.category_rounded, Color(0xFF55608A), Color(0xFFA3ACCB)),
   ];
 
-  /// Style used for settle-up payments.
-  static const payment =
-      CategoryStyle('Payment', Icons.payments_rounded, Color(0xFF10B981));
+  /// Style used for settle-up payments (the "owes you" ink).
+  static const payment = CategoryStyle(
+      'Payment', Icons.payments_rounded, Color(0xFF1E3FA3), Color(0xFF9CB0FF));
 
   static CategoryStyle of(String? name, {bool isPayment = false}) {
     if (isPayment) return payment;
@@ -46,14 +52,14 @@ class GroupTypes {
   GroupTypes._();
 
   static const List<CategoryStyle> all = [
-    CategoryStyle('Trip', Icons.flight_takeoff_rounded, Color(0xFF0EA5E9)),
-    CategoryStyle('Home', Icons.home_rounded, Color(0xFF8B5CF6)),
-    CategoryStyle('Couple', Icons.favorite_rounded, Color(0xFFEC4899)),
-    CategoryStyle('Food', Icons.restaurant_rounded, Color(0xFFF97316)),
-    CategoryStyle('Bills', Icons.receipt_long_rounded, Color(0xFFF59E0B)),
-    CategoryStyle('Work', Icons.work_rounded, Color(0xFF3B82F6)),
-    CategoryStyle('Event', Icons.celebration_rounded, Color(0xFFE11D48)),
-    CategoryStyle('Other', Icons.groups_rounded, Color(0xFF4F46E5)),
+    CategoryStyle('Trip', Icons.flight_takeoff_rounded, Color(0xFF1D5E8C), Color(0xFF7FB6E0)),
+    CategoryStyle('Home', Icons.home_rounded, Color(0xFF5B3A8E), Color(0xFFB394EA)),
+    CategoryStyle('Couple', Icons.favorite_rounded, Color(0xFF8E2F5F), Color(0xFFE07FAA)),
+    CategoryStyle('Food', Icons.restaurant_rounded, Color(0xFFA4521A), Color(0xFFE3965E)),
+    CategoryStyle('Bills', Icons.receipt_long_rounded, Color(0xFF8A5A00), Color(0xFFD9A54A)),
+    CategoryStyle('Work', Icons.work_rounded, Color(0xFF2F4A9E), Color(0xFF9CB0FF)),
+    CategoryStyle('Event', Icons.celebration_rounded, Color(0xFFA12B2B), Color(0xFFF07A72)),
+    CategoryStyle('Other', Icons.groups_rounded, Color(0xFF3C6B22), Color(0xFFA9D18E)),
   ];
 
   static CategoryStyle of(String? name) {

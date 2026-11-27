@@ -97,7 +97,7 @@ These files are listed in `.gitignore` — never commit them.
 The app relies on the security rules and composite indexes in this repo:
 
 ```bash
-firebase deploy --only firestore:rules,firestore:indexes,storage
+firebase deploy --only firestore:rules,firestore:indexes
 ```
 
 To use Google / Apple sign-in, enable those providers in the Firebase console

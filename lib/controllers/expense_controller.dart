@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import '../core/feedback.dart';
 import '../core/formatters.dart';
+import '../core/image_store.dart';
 import 'auth_controller.dart';
 import 'friend_controller.dart';
 import 'notification_controller.dart';
@@ -44,17 +44,23 @@ class ExpenseController extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   StreamSubscription<User?>? _authSubscription;
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _openSub;
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _activitySub;
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _monthSub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _allSub;
   Worker? _friendsWorker;
+  Worker? _currencyWorker;
   Timer? _publishDebounce;
   String? _activeUid;
 
-  /// All *unsettled* expenses involving the user (no limit — balances must
-  /// account for every open debt, however old).
-  final Map<String, Map<String, dynamic>> _openCache = {};
+  /// Every expense / payment involving the user, from ONE live query
+  /// (`involvedUsers array-contains uid`). That query needs no composite
+  /// index, so nothing breaks before indexes are deployed, and every view
+  /// (balances, activity, month, group & friend lists) is derived from it —
+  /// one connection instead of several keeps the app fast.
+  final Map<String, Map<String, dynamic>> _all = {};
+  List<Map<String, dynamic>> _sorted = const [];
   final Map<String, String> _nameCache = {};
+
+  /// Bumped every time the expense cache changes; detail streams listen to it.
+  final _version = 0.obs;
 
   static const int _activityPageSize = 30;
   int _activityLimit = _activityPageSize;
@@ -66,7 +72,7 @@ class ExpenseController extends GetxController {
 
   /// Most recent activity (settled and unsettled), newest first. Paginated.
   final recentActivity = <Map<String, dynamic>>[].obs;
-  final hasMoreActivity = true.obs;
+  final hasMoreActivity = false.obs;
   final isLoadingMore = false.obs;
 
   /// Net balance per person per currency. Positive = they owe you.
@@ -94,7 +100,8 @@ class ExpenseController extends GetxController {
     super.onInit();
     _bindFriendNames();
     if (Get.isRegistered<ProfileController>()) {
-      _currencyWorker = ever(Get.find<ProfileController>().currencyCode, (_) => _computeMonth());
+      _currencyWorker =
+          ever(Get.find<ProfileController>().currencyCode, (_) => _computeMonth());
     }
     _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
       if (user == null) {
@@ -121,16 +128,13 @@ class ExpenseController extends GetxController {
   }
 
   void _cancelStreams() {
-    _openSub?.cancel();
-    _activitySub?.cancel();
-    _monthSub?.cancel();
-    _openSub = null;
-    _activitySub = null;
-    _monthSub = null;
+    _allSub?.cancel();
+    _allSub = null;
   }
 
   void _clear() {
-    _openCache.clear();
+    _all.clear();
+    _sorted = const [];
     openExpenses.clear();
     recentActivity.clear();
     balances.clear();
@@ -138,105 +142,53 @@ class ExpenseController extends GetxController {
     iOweByCurrency.clear();
     monthSpendByCurrency.clear();
     monthSpendByCategory.clear();
-    _monthDocs = const [];
     settleUpData.clear();
     _activityLimit = _activityPageSize;
-    hasMoreActivity.value = true;
+    hasMoreActivity.value = false;
+    _version.value++;
   }
 
-  /// Re-subscribe all streams (pull-to-refresh / retry).
+  /// Re-subscribe (pull-to-refresh / retry).
   Future<void> refreshData() async {
     final uid = currentUid;
     if (uid == null) return;
     _subscribe(uid);
-    // Give the first snapshot a moment so the refresh indicator is meaningful.
     await Future.delayed(const Duration(milliseconds: 500));
   }
 
   void _subscribe(String uid) {
     _cancelStreams();
-    isLoading.value = true;
+    isLoading.value = _all.isEmpty;
     hasError.value = false;
 
-    _openSub = _firestore
+    _allSub = _firestore
         .collection('expenses')
         .where('involvedUsers', arrayContains: uid)
-        .where('isSettled', isEqualTo: false)
         .snapshots()
         .listen(
       (snap) {
         for (final change in snap.docChanges) {
           if (change.type == DocumentChangeType.removed) {
-            _openCache.remove(change.doc.id);
+            _all.remove(change.doc.id);
           } else {
             final data = change.doc.data();
             if (data != null) {
-              _openCache[change.doc.id] = {...data, 'id': change.doc.id};
+              _all[change.doc.id] = {...data, 'id': change.doc.id};
               _rememberNames(data);
             }
           }
         }
+        hasError.value = false;
         isLoading.value = false;
         _schedulePublish();
       },
       onError: (Object e) {
-        debugPrint('Open expenses stream error: $e');
+        debugPrint('Expenses stream error: $e');
         hasError.value = true;
         isLoading.value = false;
       },
     );
-
-    _listenActivity(uid);
-    _listenMonth(uid);
   }
-
-  void _listenActivity(String uid) {
-    _activitySub?.cancel();
-    _activitySub = _firestore
-        .collection('expenses')
-        .where('involvedUsers', arrayContains: uid)
-        .orderBy('createdAt', descending: true)
-        .limit(_activityLimit)
-        .snapshots()
-        .listen(
-      (snap) {
-        final list = snap.docs.map((d) {
-          final data = d.data();
-          _rememberNames(data);
-          return {...data, 'id': d.id};
-        }).toList();
-        recentActivity.value = list;
-        hasMoreActivity.value = list.length >= _activityLimit;
-        isLoadingMore.value = false;
-      },
-      onError: (Object e) {
-        debugPrint('Activity stream error: $e');
-        isLoadingMore.value = false;
-      },
-    );
-  }
-
-  void _listenMonth(String uid) {
-    final now = DateTime.now();
-    final monthStart = DateTime(now.year, now.month);
-    _monthSub?.cancel();
-    _monthSub = _firestore
-        .collection('expenses')
-        .where('involvedUsers', arrayContains: uid)
-        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(monthStart))
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .listen(
-      (snap) {
-        _monthDocs = snap.docs.map((d) => d.data()).toList();
-        _computeMonth();
-      },
-      onError: (Object e) => debugPrint('Month stream error: $e'),
-    );
-  }
-
-  List<Map<String, dynamic>> _monthDocs = const [];
-  Worker? _currencyWorker;
 
   /// Month totals. Category breakdown only counts the user's default
   /// currency so the proportions are never mixing currencies.
@@ -246,9 +198,13 @@ class ExpenseController extends GetxController {
     final preferred = Get.isRegistered<ProfileController>()
         ? Get.find<ProfileController>().currencyCode.value
         : 'USD';
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month);
     final byCurrency = <String, double>{};
     final byCategory = <String, double>{};
-    for (final e in _monthDocs) {
+    for (final e in _sorted) {
+      final created = Fmt.toDate(e['createdAt']) ?? now; // pending write = now
+      if (created.isBefore(monthStart)) break; // _sorted is newest first
       if (isPayment(e)) continue;
       final share = _num(Map<String, dynamic>.from(e['individualSplits'] ?? {})[uid]);
       if (share <= 0) continue;
@@ -262,13 +218,18 @@ class ExpenseController extends GetxController {
     monthSpendByCategory.value = byCategory;
   }
 
-  /// Loads the next page of activity.
+  void _publishActivity() {
+    recentActivity.value = _sorted.take(_activityLimit).toList();
+    hasMoreActivity.value = _sorted.length > _activityLimit;
+  }
+
+  /// Shows the next page of activity (data is already loaded locally).
   void loadMoreActivity() {
-    final uid = currentUid;
-    if (uid == null || isLoadingMore.value || !hasMoreActivity.value) return;
+    if (isLoadingMore.value || !hasMoreActivity.value) return;
     isLoadingMore.value = true;
     _activityLimit += _activityPageSize;
-    _listenActivity(uid);
+    _publishActivity();
+    isLoadingMore.value = false;
   }
 
   // ---------- Names ----------
@@ -372,8 +333,11 @@ class ExpenseController extends GetxController {
     final me = currentUid;
     if (me == null) return;
 
-    final open = _openCache.values.toList()..sort(_byCreatedDesc);
+    _sorted = _all.values.toList()..sort(_byCreatedDesc);
+    final open = _sorted.where((e) => e['isSettled'] != true).toList();
     openExpenses.value = open;
+    _publishActivity();
+    _computeMonth();
 
     final net = <String, Map<String, double>>{};
     for (final e in open) {
@@ -413,6 +377,7 @@ class ExpenseController extends GetxController {
           'byCurrency': entry.value,
         },
     };
+    _version.value++;
   }
 
   String _avatarFor(String uid) {
@@ -441,7 +406,7 @@ class ExpenseController extends GetxController {
     final me = currentUid;
     final result = <String, double>{};
     if (me == null) return result;
-    for (final e in _openCache.values) {
+    for (final e in openExpenses) {
       if (e['groupId'] != groupId) continue;
       final cur = (e['currencyCode'] ?? 'USD').toString();
       final n = netForExpense(e, me).values.fold(0.0, (a, b) => a + b);
@@ -456,7 +421,7 @@ class ExpenseController extends GetxController {
     final me = currentUid;
     final result = <String, Map<String, double>>{};
     if (me == null) return result;
-    for (final e in _openCache.values) {
+    for (final e in openExpenses) {
       if (e['groupId'] != groupId) continue;
       final cur = (e['currencyCode'] ?? 'USD').toString();
       netForExpense(e, me).forEach((uid, amt) {
@@ -480,36 +445,37 @@ class ExpenseController extends GetxController {
 
   // ---------- Streams for detail screens ----------
 
-  /// Live list of a group's expenses visible to the user.
-  Stream<List<Map<String, dynamic>>> groupExpensesStream(String groupId) {
-    final uid = currentUid;
-    if (uid == null) return Stream.value(const []);
-    return _firestore
-        .collection('expenses')
-        .where('involvedUsers', arrayContains: uid)
-        .where('groupId', isEqualTo: groupId)
-        .orderBy('createdAt', descending: true)
-        .limit(200)
-        .snapshots()
-        .map((s) => s.docs.map((d) => {...d.data(), 'id': d.id}).toList());
+  /// Live list derived from the local expense cache (no extra query).
+  ///
+  /// `Stream.multi` gives every listener its own subscription, so widgets
+  /// that re-subscribe (e.g. switching tabs) never hit "Stream has already
+  /// been listened to".
+  Stream<List<Map<String, dynamic>>> _derived(
+    bool Function(Map<String, dynamic> e) test,
+  ) {
+    return Stream.multi((c) {
+      void emit() {
+        if (c.isClosed) return;
+        if (hasError.value && _all.isEmpty) {
+          c.addError(Exception("Couldn't load expenses"));
+        } else if (!isLoading.value) {
+          c.add(_sorted.where(test).toList());
+        }
+      }
+
+      emit();
+      final worker = everAll([_version, isLoading, hasError], (_) => emit());
+      c.onCancel = worker.dispose;
+    });
   }
 
+  /// Live list of a group's expenses visible to the user, newest first.
+  Stream<List<Map<String, dynamic>>> groupExpensesStream(String groupId) =>
+      _derived((e) => e['groupId'] == groupId);
+
   /// Live list of expenses shared between the user and one friend.
-  Stream<List<Map<String, dynamic>>> sharedWithStream(String friendUid) {
-    final uid = currentUid;
-    if (uid == null) return Stream.value(const []);
-    return _firestore
-        .collection('expenses')
-        .where('involvedUsers', arrayContains: uid)
-        .orderBy('createdAt', descending: true)
-        .limit(200)
-        .snapshots()
-        .map((s) => s.docs
-            .map((d) => {...d.data(), 'id': d.id})
-            .where((e) =>
-                (e['involvedUsers'] as List?)?.contains(friendUid) ?? false)
-            .toList());
-  }
+  Stream<List<Map<String, dynamic>>> sharedWithStream(String friendUid) =>
+      _derived((e) => (e['involvedUsers'] as List?)?.contains(friendUid) ?? false);
 
   /// Live single expense (null if deleted / not accessible).
   Stream<Map<String, dynamic>?> expenseStream(String id) {
@@ -789,9 +755,7 @@ class ExpenseController extends GetxController {
       final url = await _uploadReceipt(expenseId, receiptFile);
       if (url != null) await ref.update({'receiptUrl': url});
     } else if (removeReceipt) {
-      unawaited(FirebaseStorage.instance
-          .ref('receipts/$expenseId.jpg')
-          .delete()
+      unawaited(ImageStore.deleteReceipt(expenseId)
           .catchError((Object e) => debugPrint('Receipt delete failed: $e')));
     }
 
@@ -807,15 +771,17 @@ class ExpenseController extends GetxController {
   Future<void> deleteExpense(Map<String, dynamic> expense) async {
     final id = expense['id']?.toString();
     if (id == null) return;
-    await _firestore.collection('expenses').doc(id).delete();
-    _openCache.remove(id);
-    _schedulePublish();
+    // Receipt first: its security rule checks the expense's participants.
     if ((expense['receiptUrl'] ?? '').toString().isNotEmpty) {
-      unawaited(FirebaseStorage.instance
-          .ref('receipts/$id.jpg')
-          .delete()
-          .catchError((Object e) => debugPrint('Receipt delete failed: $e')));
+      try {
+        await ImageStore.deleteReceipt(id);
+      } catch (e) {
+        debugPrint('Receipt delete failed: $e');
+      }
     }
+    await _firestore.collection('expenses').doc(id).delete();
+    _all.remove(id);
+    _schedulePublish();
     unawaited(_notifyParticipants(
       expense,
       title: 'Expense deleted',
@@ -834,16 +800,15 @@ class ExpenseController extends GetxController {
 
   Future<String?> _uploadReceipt(String expenseId, File file) async {
     try {
-      final ref = FirebaseStorage.instance.ref('receipts/$expenseId.jpg');
-      await ref
-          .putFile(file, SettableMetadata(contentType: 'image/jpeg'))
-          .timeout(const Duration(seconds: 60));
-      return await ref.getDownloadURL();
+      return await ImageStore.saveReceipt(expenseId, await file.readAsBytes());
     } catch (e) {
       debugPrint('Receipt upload failed: $e');
       AppToast.warning(
-        'The expense was saved, but the receipt photo could not be uploaded. '
-        'You can add it again by editing the expense.',
+        e is ImageTooLargeException
+            ? 'The expense was saved, but that receipt photo is too large. '
+                'Try taking it again a little further away.'
+            : 'The expense was saved, but the receipt photo could not be uploaded. '
+                'You can add it again by editing the expense.',
         title: 'Receipt not uploaded',
       );
       return null;
@@ -927,7 +892,7 @@ class ExpenseController extends GetxController {
     final batch = _firestore.batch();
     var count = 0;
 
-    for (final e in _openCache.values) {
+    for (final e in openExpenses) {
       final payer = payerOf(e);
       if (payer != me && payer != friendUid) continue;
       final splits = Map<String, dynamic>.from(e['individualSplits'] ?? {});

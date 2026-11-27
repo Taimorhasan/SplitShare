@@ -4,7 +4,9 @@ import 'package:get/get.dart';
 import '../controllers/expense_controller.dart';
 import '../controllers/friend_controller.dart';
 import '../controllers/profile_controller.dart';
+import '../app/routes/app_routes.dart';
 import '../controllers/shell_controller.dart';
+import '../controllers/trip_controller.dart';
 import '../core/ui.dart';
 
 /// Lists everyone the user owes / who owes the user, and records payments.
@@ -16,18 +18,6 @@ class SettleUpScreen extends StatefulWidget {
 
   @override
   State<SettleUpScreen> createState() => _SettleUpScreenState();
-}
-
-class _BalanceRow {
-  final String uid;
-  final String name;
-  final String avatarUrl;
-
-  /// Signed amounts (positive = owed to me), only one direction per row.
-  final Map<String, double> byCurrency;
-  final double sortKey;
-
-  const _BalanceRow(this.uid, this.name, this.avatarUrl, this.byCurrency, this.sortKey);
 }
 
 class _SettleUpScreenState extends State<SettleUpScreen> {
@@ -102,46 +92,59 @@ class _SettleUpScreenState extends State<SettleUpScreen> {
     );
   }
 
-  ({List<_BalanceRow> owe, List<_BalanceRow> owed}) _split(String pref) {
-    final owe = <_BalanceRow>[];
-    final owed = <_BalanceRow>[];
+  /// Everyone I have a balance with, combining friends/groups expenses and
+  /// every Lain Dain trip, netted per person and currency.
+  List<_Combined> _combine() {
+    final byKey = <String, _Combined>{};
     for (final entry in _ctrl.settleUpData.values) {
       final raw = entry['byCurrency'];
       if (raw is! Map) continue;
-      final map = Map<String, double>.from(raw);
-      final neg = Map.fromEntries(map.entries.where((e) => e.value < -0.005));
-      final pos = Map.fromEntries(map.entries.where((e) => e.value > 0.005));
-      double key(Map<String, double> m) =>
-          (m[pref] ?? m.values.fold<double>(0.0, (a, b) => a.abs() >= b.abs() ? a : b)).abs();
       final uid = (entry['uid'] ?? '').toString();
-      final name = (entry['name'] ?? 'Friend').toString();
-      final avatar = (entry['avatarUrl'] ?? '').toString();
-      if (neg.isNotEmpty) owe.add(_BalanceRow(uid, name, avatar, neg, key(neg)));
-      if (pos.isNotEmpty) owed.add(_BalanceRow(uid, name, avatar, pos, key(pos)));
+      final c = byKey.putIfAbsent(
+        uid,
+        () => _Combined(
+          key: uid,
+          uid: uid,
+          name: (entry['name'] ?? 'Friend').toString(),
+          avatarUrl: (entry['avatarUrl'] ?? '').toString(),
+        ),
+      );
+      c.expenses.addAll(Map<String, double>.from(raw));
     }
-    owe.sort((a, b) => b.sortKey.compareTo(a.sortKey));
-    owed.sort((a, b) => b.sortKey.compareTo(a.sortKey));
-    return (owe: owe, owed: owed);
+    TripController.to.myBalances().forEach((key, t) {
+      final c = byKey.putIfAbsent(
+        key,
+        () => _Combined(key: key, uid: t.uid, name: t.name, avatarUrl: t.avatarUrl),
+      );
+      t.byCurrency.forEach((cur, v) => c.trips[cur] = (c.trips[cur] ?? 0) + v);
+      c.tripLines.addAll(t.trips);
+      if (c.avatarUrl.isEmpty) c.avatarUrl = t.avatarUrl;
+    });
+    final list = byKey.values.where((c) => c.total.isNotEmpty).toList();
+    return list;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: const AppTopBar(title: 'Settle up'),
+      appBar: const AppTopBar(title: 'Settle up', subtitle: 'Friends & groups'),
       body: Obx(() {
         final pref = ProfileController.to.currencyCode.value;
-        final data = _ctrl.settleUpData;
+        // Reactive dependencies.
+        _ctrl.settleUpData.length;
+        TripController.to.trips.length;
+        final people = _combine();
         final Widget child;
 
-        if (_ctrl.isLoading.value && data.isEmpty) {
+        if (_ctrl.isLoading.value && people.isEmpty) {
           child = const _SettleSkeleton(key: ValueKey('loading'));
-        } else if (_ctrl.hasError.value && data.isEmpty) {
+        } else if (_ctrl.hasError.value && people.isEmpty) {
           child = ErrorState(
             key: const ValueKey('error'),
             onRetry: _ctrl.refreshData,
           );
-        } else if (data.isEmpty) {
+        } else if (people.isEmpty) {
           child = EmptyState(
             key: const ValueKey('empty'),
             icon: Icons.celebration_rounded,
@@ -152,18 +155,42 @@ class _SettleUpScreenState extends State<SettleUpScreen> {
               Icons.star_rounded,
             ],
             title: 'All settled up!',
-            message: 'Nobody owes anything right now. Add an expense when you share a bill.',
+            message: 'Nobody owes anything right now, with friends or in groups.',
             actionLabel: 'Add expense',
             actionIcon: Icons.add_rounded,
             onAction: () => AppNav.addExpense(),
           );
         } else {
-          final groups = _split(pref);
+          double key(_Combined c) {
+            final m = c.total;
+            return (m[pref] ?? m.values.fold<double>(0, (a, b) => a.abs() >= b.abs() ? a : b));
+          }
+
+          final give = people.where((c) => key(c) < 0).toList()
+            ..sort((a, b) => key(a).compareTo(key(b)));
+          final receive = people.where((c) => key(c) > 0).toList()
+            ..sort((a, b) => key(b).compareTo(key(a)));
+
+          final owe = <String, double>{};
+          final owed = <String, double>{};
+          for (final c in people) {
+            c.total.forEach((cur, v) {
+              if (v < 0) {
+                owe[cur] = (owe[cur] ?? 0) - v;
+              } else {
+                owed[cur] = (owed[cur] ?? 0) + v;
+              }
+            });
+          }
+
           var index = 0;
           child = RefreshIndicator(
             key: const ValueKey('data'),
             color: AppColors.primary,
-            onRefresh: _ctrl.refreshData,
+            onRefresh: () async {
+              TripController.to.fetchTrips();
+              await _ctrl.refreshData();
+            },
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(
@@ -175,51 +202,65 @@ class _SettleUpScreenState extends State<SettleUpScreen> {
               children: [
                 FadeSlideIn(
                   index: index++,
-                  child: _SummaryCard(
-                    owe: Map<String, double>.from(_ctrl.iOweByCurrency),
-                    owed: Map<String, double>.from(_ctrl.owedToMeByCurrency),
-                    preferred: pref,
-                  ),
+                  child: _SummaryCard(owe: owe, owed: owed, preferred: pref),
                 ),
-                if (groups.owe.isNotEmpty) ...[
-                  const SectionHeader(
-                    title: 'You owe',
-                    padding: EdgeInsets.only(top: AppSpacing.xxl, bottom: AppSpacing.md),
+                if (give.isNotEmpty) ...[
+                  SectionHeader(
+                    title: 'You have to give (${give.length})',
+                    padding:
+                        const EdgeInsets.only(top: AppSpacing.xxl, bottom: AppSpacing.md),
                   ),
-                  for (final row in groups.owe)
-                    FadeSlideIn(
-                      index: index++,
-                      child: _PersonBalanceTile(
-                        row: row,
+                  FadeSlideIn(
+                    index: index++,
+                    child: _PeopleCard(
+                      children: [
+                        for (final c in give)
+                          _CombinedTile(
+                        person: c,
                         preferred: pref,
-                        onTap: () => _openSheet(
-                          uid: row.uid,
-                          name: row.name,
-                          avatarUrl: row.avatarUrl,
-                          iOwe: true,
-                        ),
-                      ),
+                        onRecord: c.uid == null || c.expenses.isEmpty
+                            ? null
+                            : () => _openSheet(
+                                  uid: c.uid!,
+                                  name: c.name,
+                                  avatarUrl: c.avatarUrl,
+                                  iOwe: (c.expenses[pref] ??
+                                          c.expenses.values.first) <
+                                      0,
+                                ),
+                          ),
+                      ],
                     ),
+                  ),
                 ],
-                if (groups.owed.isNotEmpty) ...[
-                  const SectionHeader(
-                    title: 'Owes you',
-                    padding: EdgeInsets.only(top: AppSpacing.xxl, bottom: AppSpacing.md),
+                if (receive.isNotEmpty) ...[
+                  SectionHeader(
+                    title: 'You will receive (${receive.length})',
+                    padding:
+                        const EdgeInsets.only(top: AppSpacing.xxl, bottom: AppSpacing.md),
                   ),
-                  for (final row in groups.owed)
-                    FadeSlideIn(
-                      index: index++,
-                      child: _PersonBalanceTile(
-                        row: row,
+                  FadeSlideIn(
+                    index: index++,
+                    child: _PeopleCard(
+                      children: [
+                        for (final c in receive)
+                          _CombinedTile(
+                        person: c,
                         preferred: pref,
-                        onTap: () => _openSheet(
-                          uid: row.uid,
-                          name: row.name,
-                          avatarUrl: row.avatarUrl,
-                          iOwe: false,
-                        ),
-                      ),
+                        onRecord: c.uid == null || c.expenses.isEmpty
+                            ? null
+                            : () => _openSheet(
+                                  uid: c.uid!,
+                                  name: c.name,
+                                  avatarUrl: c.avatarUrl,
+                                  iOwe: (c.expenses[pref] ??
+                                          c.expenses.values.first) <
+                                      0,
+                                ),
+                          ),
+                      ],
                     ),
+                  ),
                 ],
               ],
             ),
@@ -229,6 +270,30 @@ class _SettleUpScreenState extends State<SettleUpScreen> {
         return AnimatedSwitcher(duration: AppMotion.normal, child: child);
       }),
     );
+  }
+}
+
+/// One person's combined position with me.
+class _Combined {
+  final String key;
+  final String? uid;
+  final String name;
+  String avatarUrl;
+
+  /// Signed, positive = they owe me.
+  final Map<String, double> expenses = {};
+  final Map<String, double> trips = {};
+  final List<({String tripId, String title, double amount, String currency})> tripLines =
+      [];
+
+  _Combined({required this.key, required this.uid, required this.name, required this.avatarUrl});
+
+  /// Expenses + Lain Dain, cancelled against each other.
+  Map<String, double> get total {
+    final m = <String, double>{...expenses};
+    trips.forEach((cur, v) => m[cur] = (m[cur] ?? 0) + v);
+    m.removeWhere((_, v) => v.abs() < 0.005);
+    return m;
   }
 }
 
@@ -247,145 +312,248 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget column(String label, Map<String, double> m, IconData icon) => Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, size: 15, color: Colors.white.withValues(alpha: 0.8)),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                Fmt.multi(m, preferred: preferred),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ],
-          ),
-        );
-
-    return AppCard(
-      gradient: AppColors.heroGradient,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                column('You owe', owe, Icons.call_made_rounded),
-                Container(
-                  width: 1,
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  color: Colors.white.withValues(alpha: 0.2),
-                ),
-                column('You are owed', owed, Icons.call_received_rounded),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.touch_app_rounded, size: 14, color: Colors.white),
-                SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    'Tap a person to record a payment',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+    final net = (owed[preferred] ?? 0) - (owe[preferred] ?? 0);
+    final label = net > 0.005
+        ? 'Overall, you are owed'
+        : net < -0.005
+            ? 'Overall, you owe'
+            : 'Net balance';
+    final others = <String, double>{};
+    for (final c in {...owe.keys, ...owed.keys}) {
+      if (c == preferred) continue;
+      final v = (owed[c] ?? 0) - (owe[c] ?? 0);
+      if (v.abs() >= 0.005) others[c] = v;
+    }
+    var caption = 'You get back ${Fmt.multi(owed, preferred: preferred)}'
+        ' · you owe ${Fmt.multi(owe, preferred: preferred)}'
+        '\nIncludes friends and groups';
+    if (others.isNotEmpty) {
+      caption = 'Net ${Fmt.multi(others, preferred: preferred, absolute: false)}'
+          ' in other currencies\n$caption';
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
+      child: KhataTotal(
+        label: label,
+        amount: Fmt.money(net.abs(), currencyCode: preferred),
+        caption: caption,
+        color: net < -0.005 ? AppColors.negative : null,
       ),
     );
   }
 }
 
-class _PersonBalanceTile extends StatelessWidget {
-  final _BalanceRow row;
-  final String preferred;
-  final VoidCallback onTap;
+/// One section's people: rows in a single ruled block.
+class _PeopleCard extends StatelessWidget {
+  final List<Widget> children;
+  const _PeopleCard({required this.children});
 
-  const _PersonBalanceTile({
-    required this.row,
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0)
+                Divider(height: 1, thickness: 1, color: AppColors.border),
+              children[i],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One person: the overall amount (after cancelling everything) plus where
+/// it comes from — friends & groups, and each Lain Dain trip.
+class _CombinedTile extends StatelessWidget {
+  final _Combined person;
+  final String preferred;
+  final VoidCallback? onRecord;
+
+  const _CombinedTile({
+    required this.person,
     required this.preferred,
-    required this.onTap,
+    required this.onRecord,
   });
 
   @override
   Widget build(BuildContext context) {
-    final iOwe = row.byCurrency.values.any((v) => v < 0);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: AppCard(
-        onTap: onTap,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        child: Row(
-          children: [
-            AppAvatar(name: row.name, imageUrl: row.avatarUrl, radius: 22),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    row.name,
+    final total = person.total;
+    final primary =
+        total[preferred] ?? total.values.fold<double>(0, (a, b) => a.abs() >= b.abs() ? a : b);
+    final iGive = primary < 0;
+    final tone = iGive ? AppColors.negative : AppColors.positive;
+    final first = Fmt.firstName(person.name);
+    final amount = Fmt.multi(total, preferred: preferred);
+    final headline = iGive ? 'You give $first' : '$first gives you';
+
+    String part(Map<String, double> m) {
+      final v = m[preferred] ?? (m.isEmpty ? 0 : m.values.first);
+      final text = Fmt.multi(m, preferred: preferred);
+      return v < 0 ? 'you owe $text' : '$first owes you $text';
+    }
+
+    Widget line(IconData icon, String label, String value, {VoidCallback? onTap}) =>
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
+            child: Row(
+              children: [
+                Icon(icon, size: 16, color: AppColors.textMuted),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15.5,
+                    style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    value,
+                    textAlign: TextAlign.end,
+                    maxLines: 2,
+                    style: TextStyle(
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    iOwe ? 'Tap to pay' : 'Tap to record or remind',
-                    style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                ),
+                if (onTap != null)
+                  Icon(Icons.chevron_right_rounded,
+                      size: 18, color: AppColors.textMuted),
+              ],
+            ),
+          ),
+        );
+
+    final hasBoth = person.expenses.isNotEmpty && person.tripLines.isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.md + 2,
+        AppSpacing.lg,
+        AppSpacing.md,
+      ),
+      child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                AppAvatar(name: person.name, imageUrl: person.avatarUrl, radius: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        person.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        hasBoth ? 'Total after cancelling everything' : 'In total',
+                        style: TextStyle(
+                            fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                    ],
                   ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      headline,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: tone,
+                      ),
+                    ),
+                    Text(
+                      amount,
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: iGive ? AppColors.negative : AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Padding(
+              padding: const EdgeInsets.only(left: 52),
+              child: Column(
+                children: [
+                  if (person.expenses.isNotEmpty)
+                    line(Icons.receipt_long_rounded, 'Friends & groups',
+                        part(person.expenses)),
+                  for (final t in person.tripLines)
+                    line(
+                      Icons.luggage_rounded,
+                      'Group · ${t.title}',
+                      part({t.currency: t.amount}),
+                      onTap: () =>
+                          Get.toNamed(AppRoutes.tripDetail, arguments: {'id': t.tripId}),
+                    ),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
-            Flexible(
-              child: BalanceLabel(byCurrency: row.byCurrency, preferredCurrency: preferred),
-            ),
+            if (onRecord != null) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      label: iGive ? 'Pay $first' : 'Record / remind',
+                      icon: iGive ? Icons.send_rounded : Icons.handshake_rounded,
+                      height: 44,
+                      variant:
+                          iGive ? AppButtonVariant.primary : AppButtonVariant.success,
+                      onPressed: onRecord,
+                    ),
+                  ),
+                ],
+              ),
+              if (person.tripLines.isNotEmpty)
+                Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Text(
+                    'Payments here settle shared expenses. Mark group '
+                    'pay-backs inside the group.',
+                    style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                  ),
+                ),
+            ] else if (person.tripLines.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text(
+                  'Tap a group to mark the pay-back there.',
+                  style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                ),
+              ),
           ],
         ),
-      ),
     );
   }
 }
@@ -567,7 +735,7 @@ class _PaymentSheetState extends State<_PaymentSheet> {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -586,7 +754,7 @@ class _PaymentSheetState extends State<_PaymentSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const IconBadge(
+            IconBadge(
               icon: Icons.verified_rounded,
               color: AppColors.positive,
               size: 60,
@@ -617,22 +785,15 @@ class _PaymentSheetState extends State<_PaymentSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceMuted,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
               child: Row(
                 children: [
                   if (widget.iOwe) me else them,
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      gradient: AppColors.positiveGradient,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    color: AppColors.textSecondary,
+                    size: 24,
                   ),
                   if (widget.iOwe) them else me,
                 ],
@@ -642,11 +803,11 @@ class _PaymentSheetState extends State<_PaymentSheet> {
             Text(
               widget.iOwe ? 'You → $_first' : '$_first → You',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             if (_currencies.length > 1) ...[
               const SizedBox(height: 18),
-              const Text(
+              Text(
                 'Currency',
                 style: TextStyle(
                   fontSize: 13.5,
@@ -746,7 +907,7 @@ class _CurrencyChip extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : AppColors.textPrimary,
+            color: selected ? AppColors.onPrimary : AppColors.textPrimary,
           ),
         ),
       ),
@@ -763,7 +924,11 @@ class _SettleSkeleton extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, 0),
       children: const [
-        Skeleton(height: 132, radius: AppRadius.lg),
+        Skeleton(width: 120, height: 12),
+        SizedBox(height: 8),
+        Skeleton(width: 200, height: 40),
+        SizedBox(height: 12),
+        Skeleton(width: 240, height: 12),
         SizedBox(height: 28),
         Skeleton(width: 90, height: 16),
         SizedBox(height: 14),

@@ -5,7 +5,7 @@ import 'pressable.dart';
 
 enum AppButtonVariant { primary, secondary, outline, danger, ghost, success }
 
-/// The one button used across the app.
+/// The one button used across the app. Flat ink, no gradients or glows.
 ///
 /// * Shows a spinner and ignores taps while [loading] is true, which prevents
 ///   duplicate submissions.
@@ -27,7 +27,7 @@ class AppButton extends StatelessWidget {
     this.icon,
     this.loading = false,
     this.expand = true,
-    this.height = 54,
+    this.height = 52,
   });
 
   const AppButton.secondary({
@@ -37,7 +37,7 @@ class AppButton extends StatelessWidget {
     this.icon,
     this.loading = false,
     this.expand = true,
-    this.height = 54,
+    this.height = 52,
   }) : variant = AppButtonVariant.secondary;
 
   const AppButton.outline({
@@ -47,7 +47,7 @@ class AppButton extends StatelessWidget {
     this.icon,
     this.loading = false,
     this.expand = true,
-    this.height = 54,
+    this.height = 52,
   }) : variant = AppButtonVariant.outline;
 
   const AppButton.danger({
@@ -57,70 +57,41 @@ class AppButton extends StatelessWidget {
     this.icon,
     this.loading = false,
     this.expand = true,
-    this.height = 54,
+    this.height = 52,
   }) : variant = AppButtonVariant.danger;
 
   bool get _enabled => onPressed != null && !loading;
 
   @override
   Widget build(BuildContext context) {
-    final Gradient? gradient;
-    final Color bg;
-    final Color fg;
-    BorderSide? border;
-    List<BoxShadow>? shadow;
-
-    switch (variant) {
-      case AppButtonVariant.primary:
-        gradient = AppColors.brandGradient;
-        bg = AppColors.primary;
-        fg = Colors.white;
-        shadow = _enabled ? AppShadows.glow(AppColors.primary) : null;
-        break;
-      case AppButtonVariant.success:
-        gradient = AppColors.positiveGradient;
-        bg = AppColors.positive;
-        fg = Colors.white;
-        shadow = _enabled ? AppShadows.glow(AppColors.positive) : null;
-        break;
-      case AppButtonVariant.danger:
-        gradient = null;
-        bg = AppColors.negativeLight;
-        fg = AppColors.error;
-        break;
-      case AppButtonVariant.secondary:
-        gradient = null;
-        bg = AppColors.primaryLight;
-        fg = AppColors.primary;
-        break;
-      case AppButtonVariant.outline:
-        gradient = null;
-        bg = AppColors.surface;
-        fg = AppColors.textPrimary;
-        border = const BorderSide(color: AppColors.border);
-        break;
-      case AppButtonVariant.ghost:
-        gradient = null;
-        bg = Colors.transparent;
-        fg = AppColors.primary;
-        break;
-    }
+    final (Color bg, Color fg, BorderSide? border) = switch (variant) {
+      AppButtonVariant.primary => (AppColors.primary, AppColors.onPrimary, null),
+      AppButtonVariant.success => (AppColors.positive, AppColors.onPrimary, null),
+      AppButtonVariant.danger => (AppColors.negativeLight, AppColors.negative, null),
+      AppButtonVariant.secondary => (AppColors.primaryLight, AppColors.primary, null),
+      AppButtonVariant.outline => (
+          AppColors.surface,
+          AppColors.textPrimary,
+          BorderSide(color: AppColors.border),
+        ),
+      AppButtonVariant.ghost => (Colors.transparent, AppColors.primary, null),
+    };
 
     final content = AnimatedSwitcher(
       duration: AppMotion.fast,
       child: loading
           ? SizedBox(
               key: const ValueKey('loading'),
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2.4, color: fg),
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2.2, color: fg),
             )
           : Row(
               key: const ValueKey('label'),
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (icon != null) ...[
-                  Icon(icon, color: fg, size: 20),
+                  Icon(icon, color: fg, size: 19),
                   const SizedBox(width: 8),
                 ],
                 Flexible(
@@ -130,9 +101,8 @@ class AppButton extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: fg,
-                      fontSize: 16,
+                      fontSize: 15.5,
                       fontWeight: FontWeight.w600,
-                      letterSpacing: 0.1,
                     ),
                   ),
                 ),
@@ -146,13 +116,11 @@ class AppButton extends StatelessWidget {
       child: Container(
         height: height,
         width: expand ? double.infinity : null,
-        padding: const EdgeInsets.symmetric(horizontal: 22),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
-          gradient: gradient,
-          color: gradient == null ? bg : null,
+          color: bg,
           borderRadius: BorderRadius.circular(AppRadius.md),
           border: border != null ? Border.fromBorderSide(border) : null,
-          boxShadow: shadow,
         ),
         alignment: Alignment.center,
         child: content,
@@ -171,7 +139,7 @@ class AppButton extends StatelessWidget {
   }
 }
 
-/// Round icon button with a soft surface — used in headers and toolbars.
+/// Square icon button on a hairline-ruled surface: headers and toolbars.
 class AppIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onPressed;
@@ -202,30 +170,30 @@ class AppIconButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: background ?? AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.md),
-          boxShadow: background == null ? AppShadows.soft : null,
+          border: background == null ? Border.all(color: AppColors.border) : null,
         ),
         child: Stack(
           clipBehavior: Clip.none,
           alignment: Alignment.center,
           children: [
-            Icon(icon, size: 22, color: color ?? AppColors.textPrimary),
+            Icon(icon, size: 21, color: color ?? AppColors.textPrimary),
             if (badgeCount > 0)
               Positioned(
-                top: 6,
-                right: 6,
+                top: 5,
+                right: 5,
                 child: Container(
                   constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   decoration: BoxDecoration(
                     color: AppColors.negative,
                     borderRadius: BorderRadius.circular(AppRadius.pill),
-                    border: Border.all(color: Colors.white, width: 1.5),
+                    border: Border.all(color: AppColors.surface, width: 1.5),
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     badgeCount > 9 ? '9+' : '$badgeCount',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: AppColors.onPrimary,
                       fontSize: 9,
                       fontWeight: FontWeight.w700,
                     ),

@@ -2,13 +2,16 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../app_colors.dart';
 
-/// Vector illustration composed from shapes + icons.
+/// Quiet, static spot illustration in the khata world: a small register
+/// page — a ruled card with the subject's icon written on it in ink, and a
+/// short red double rule like the line under a total.
 ///
-/// Rendered entirely in code so it is crisp at any resolution, themable,
-/// and adds no asset weight. Gently floats when [animate] is true.
-class AppIllustration extends StatefulWidget {
+/// No floating, orbiting or glowing parts. [orbitIcons] and [animate] are
+/// accepted for API compatibility and ignored; [badgeIcon] shows as a small
+/// mark on the card's corner.
+class AppIllustration extends StatelessWidget {
   final IconData icon;
-  final Color color;
+  final Color? color;
   final Color? secondaryColor;
   final double size;
   final IconData? badgeIcon;
@@ -18,7 +21,7 @@ class AppIllustration extends StatefulWidget {
   const AppIllustration({
     super.key,
     required this.icon,
-    this.color = AppColors.primary,
+    this.color,
     this.secondaryColor,
     this.size = 180,
     this.badgeIcon,
@@ -27,199 +30,61 @@ class AppIllustration extends StatefulWidget {
   });
 
   @override
-  State<AppIllustration> createState() => _AppIllustrationState();
-}
-
-class _AppIllustrationState extends State<AppIllustration>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 4),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.animate) _ctrl.repeat();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final s = widget.size;
-    final c1 = widget.color;
-    final c2 = widget.secondaryColor ?? AppColors.secondary;
-
-    return RepaintBoundary(
-      child: SizedBox(
-        width: s,
-        height: s,
-        child: AnimatedBuilder(
-          animation: _ctrl,
-          builder: (context, _) {
-            final t = _ctrl.value * 2 * math.pi;
-            final float = math.sin(t) * s * 0.025;
-            return Stack(
-              alignment: Alignment.center,
-              clipBehavior: Clip.none,
-              children: [
-                // Outer halo
-                Container(
-                  width: s,
-                  height: s,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        c1.withValues(alpha: 0.16),
-                        c1.withValues(alpha: 0.02),
-                      ],
-                    ),
-                  ),
-                ),
-                // Inner ring
-                Container(
-                  width: s * 0.72,
-                  height: s * 0.72,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: c1.withValues(alpha: 0.08),
-                    border: Border.all(
-                      color: c1.withValues(alpha: 0.12),
-                      width: 1.5,
-                    ),
-                  ),
-                ),
-                // Decorative dots
-                Positioned(
-                  top: s * 0.12,
-                  right: s * 0.16,
-                  child: _dot(s * 0.05, c2.withValues(alpha: 0.5)),
-                ),
-                Positioned(
-                  bottom: s * 0.16,
-                  left: s * 0.12,
-                  child: _dot(s * 0.035, c1.withValues(alpha: 0.45)),
-                ),
-                Positioned(
-                  top: s * 0.28,
-                  left: s * 0.06,
-                  child: _dot(s * 0.025, AppColors.accent.withValues(alpha: 0.6)),
-                ),
-                // Main tile
-                Transform.translate(
-                  offset: Offset(0, float),
-                  child: Transform.rotate(
-                    angle: -0.08,
-                    child: Container(
-                      width: s * 0.44,
-                      height: s * 0.44,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [c1, c2],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(s * 0.13),
-                        boxShadow: [
-                          BoxShadow(
-                            color: c1.withValues(alpha: 0.35),
-                            blurRadius: s * 0.14,
-                            offset: Offset(0, s * 0.06),
-                          ),
-                        ],
-                      ),
-                      child: Icon(widget.icon, color: Colors.white, size: s * 0.22),
-                    ),
-                  ),
-                ),
-                // Badge
-                if (widget.badgeIcon != null)
-                  Positioned(
-                    right: s * 0.22,
-                    bottom: s * 0.24 - float,
-                    child: Container(
-                      width: s * 0.17,
-                      height: s * 0.17,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.10),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Icon(widget.badgeIcon, color: c1, size: s * 0.095),
-                    ),
-                  ),
-                // Orbiting mini icons
-                for (var i = 0; i < widget.orbitIcons.length; i++)
-                  _orbit(i, t, s, i.isEven ? c1 : c2),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _orbit(int i, double t, double s, Color color) {
-    final count = widget.orbitIcons.length;
-    final double angle;
-    if (widget.badgeIcon != null) {
-      // Keep clear of the badge (bottom-right, ~20°–80°): spread the orbit
-      // icons over the remaining arc from 110° round to 360°.
-      const start = 110 * math.pi / 180;
-      const sweep = 250 * math.pi / 180;
-      angle = count == 1 ? start + sweep / 2 : start + sweep * i / (count - 1);
-    } else {
-      angle = (2 * math.pi / count) * i - math.pi / 3;
-    }
-    final radius = s * 0.40;
-    final bob = math.sin(t + i) * s * 0.02;
-    return Transform.translate(
-      offset: Offset(
-        math.cos(angle) * radius,
-        math.sin(angle) * radius + bob,
-      ),
-      child: Container(
-        width: s * 0.15,
-        height: s * 0.15,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(s * 0.05),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+    final ink = color ?? AppColors.primary;
+    final s = size * 0.62; // the card itself; keeps empty states compact
+    return SizedBox(
+      width: s,
+      height: s * 0.82,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border, width: 1.2),
+              ),
+              padding: EdgeInsets.fromLTRB(s * 0.14, s * 0.12, s * 0.14, s * 0.1),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, color: ink, size: s * 0.26),
+                  const Spacer(),
+                  Container(height: 1, color: AppColors.border),
+                  SizedBox(height: s * 0.08),
+                  Container(width: s * 0.42, height: 1.5, color: AppColors.rule),
+                  SizedBox(height: s * 0.03),
+                  Container(width: s * 0.42, height: 1.5, color: AppColors.rule),
+                ],
+              ),
             ),
-          ],
-        ),
-        child: Icon(widget.orbitIcons[i], color: color, size: s * 0.08),
+          ),
+          if (badgeIcon != null)
+            Positioned(
+              right: -s * 0.08,
+              top: -s * 0.08,
+              child: Container(
+                padding: EdgeInsets.all(s * 0.05),
+                decoration: BoxDecoration(
+                  color: ink,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.background, width: 2),
+                ),
+                child: Icon(badgeIcon, color: AppColors.onPrimary, size: s * 0.12),
+              ),
+            ),
+        ],
       ),
     );
   }
-
-  Widget _dot(double size, Color color) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      );
 }
 
-/// The SplitShare brand mark (gradient wallet tile with a "split" badge).
-///
-/// This widget is the single source of truth for the logo: the launcher /
-/// web / desktop icons are rendered from it by `tool/render_app_icon_test.dart`.
+/// The SplitShare mark: a coin split in two — a saffron half and a pistachio
+/// half pulling apart on a warm espresso tile. Drawn with a painter so it is
+/// crisp at every size; also rendered into the launcher icons
+/// (`tool/render_app_icon_test.dart`).
 class AppLogo extends StatelessWidget {
   final double size;
   final bool withShadow;
@@ -227,60 +92,103 @@ class AppLogo extends StatelessWidget {
   /// Corner radius as a fraction of [size] (0 = square, for full-bleed icons).
   final double cornerRadius;
 
-  /// Draw only the glyph + badge on a transparent background
-  /// (Android adaptive-icon foreground).
+  /// Draw only the coin on a transparent background
+  /// (Android adaptive-icon foreground, splash).
   final bool foregroundOnly;
+
+  /// Fixed brand colours, the same in light and dark, so the mark matches
+  /// the launcher icon everywhere.
+  static const brand = Color(0xFF1C1813); // espresso tile / splash ground
+  static const badge = Color(0xFFF4A62A); // saffron half
+  static const pista = Color(0xFFA9D18E); // pistachio half
+  static const cream = Color(0xFFFFF8EC); // splash text
+  static const ink = Color(0xFF23201A); // dark espresso (QR modules)
 
   const AppLogo({
     super.key,
     this.size = 72,
     this.withShadow = true,
-    this.cornerRadius = 0.3,
+    this.cornerRadius = 0.24,
     this.foregroundOnly = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        gradient: foregroundOnly ? null : AppColors.brandGradient,
-        borderRadius: BorderRadius.circular(size * cornerRadius),
-        boxShadow: withShadow && !foregroundOnly
-            ? [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.4),
-                  blurRadius: size * 0.35,
-                  offset: Offset(0, size * 0.12),
-                ),
-              ]
-            : null,
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Icon(
-            Icons.account_balance_wallet_rounded,
-            color: Colors.white,
-            size: size * 0.5,
-          ),
-          Positioned(
-            right: size * 0.16,
-            top: size * 0.16,
-            child: Container(
-              width: size * 0.18,
-              height: size * 0.18,
-              decoration: const BoxDecoration(
-                color: AppColors.accent,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.call_split_rounded,
-                  color: Colors.white, size: size * 0.12),
-            ),
-          ),
-        ],
+      child: CustomPaint(
+        painter: _SplitCoinPainter(
+          background: foregroundOnly ? null : brand,
+          cornerRadius: cornerRadius,
+        ),
       ),
     );
   }
+}
+
+class _SplitCoinPainter extends CustomPainter {
+  final Color? background;
+  final double cornerRadius;
+  _SplitCoinPainter({required this.background, required this.cornerRadius});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.shortestSide;
+    if (background != null) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            Offset.zero & size, Radius.circular(s * cornerRadius)),
+        Paint()..color = background!,
+      );
+    }
+
+    final c = Offset(size.width / 2, size.height / 2);
+    final r = s * 0.30;
+    // A vertical cut; the two halves slide apart sideways and one rides a
+    // little higher than the other, like a coin being shared out.
+    const angle = -math.pi / 2;
+    final dir = Offset(math.cos(angle), math.sin(angle));
+    final n = Offset(-dir.dy, dir.dx);
+    final gap = s * 0.035;
+    final lift = s * 0.06;
+
+    Path half(int side) {
+      final far = s * 2;
+      final plane = Path()
+        ..moveTo(c.dx - dir.dx * far, c.dy - dir.dy * far)
+        ..lineTo(c.dx + dir.dx * far, c.dy + dir.dy * far)
+        ..lineTo(c.dx + dir.dx * far + n.dx * far * side,
+            c.dy + dir.dy * far + n.dy * far * side)
+        ..lineTo(c.dx - dir.dx * far + n.dx * far * side,
+            c.dy - dir.dy * far + n.dy * far * side)
+        ..close();
+      final coin = Path()..addOval(Rect.fromCircle(center: c, radius: r));
+      return Path.combine(PathOperation.intersect, coin, plane)
+          .shift(_offset(n, dir, gap, lift, side));
+    }
+
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = s * 0.018
+      ..color = const Color(0x33000000);
+    void ringOn(int side) {
+      canvas.save();
+      canvas.clipPath(half(side));
+      canvas.drawCircle(c + _offset(n, dir, gap, lift, side), r * 0.74, ring);
+      canvas.restore();
+    }
+
+    canvas.drawPath(half(-1), Paint()..color = AppLogo.badge);
+    ringOn(-1);
+    canvas.drawPath(half(1), Paint()..color = AppLogo.pista);
+    ringOn(1);
+  }
+
+  static Offset _offset(Offset n, Offset dir, double gap, double lift, int side) =>
+      n * (gap * side) + dir * (lift * -side / 2);
+
+  @override
+  bool shouldRepaint(_SplitCoinPainter old) =>
+      old.background != background || old.cornerRadius != cornerRadius;
 }

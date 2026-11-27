@@ -79,7 +79,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
     final theme = Theme.of(context);
     final email = _email;
     final illustration =
-        (MediaQuery.sizeOf(context).height * 0.26).clamp(160.0, 230.0);
+        (MediaQuery.sizeOf(context).height * 0.22).clamp(140.0, 200.0);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -98,15 +98,8 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
               Center(
                 child: AppIllustration(
                   icon: Icons.mark_email_read_rounded,
-                  color: AppColors.positive,
-                  secondaryColor: AppColors.accent,
                   badgeIcon: Icons.check_rounded,
                   size: illustration,
-                  orbitIcons: const [
-                    Icons.mail_rounded,
-                    Icons.lock_open_rounded,
-                    Icons.key_rounded,
-                  ],
                 ),
               ),
               const SizedBox(height: AppSpacing.xxl),
@@ -126,33 +119,15 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                     ),
                     if (email != null) ...[
                       const SizedBox(height: AppSpacing.md),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.lg,
-                            vertical: AppSpacing.sm + 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryLight,
-                          borderRadius: BorderRadius.circular(AppRadius.pill),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.alternate_email_rounded,
-                                size: 18, color: AppColors.primary),
-                            const SizedBox(width: AppSpacing.sm),
-                            Flexible(
-                              child: Text(
-                                email,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14.5,
-                                ),
-                              ),
-                            ),
-                          ],
+                      Text(
+                        email,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15.5,
                         ),
                       ),
                     ],
@@ -169,12 +144,12 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                         number: 1,
                         text: 'Open the email and tap the reset link.',
                       ),
-                      SizedBox(height: AppSpacing.md),
+                      Divider(height: AppSpacing.xl),
                       _Step(
                         number: 2,
                         text: 'Choose a new password on the page that opens.',
                       ),
-                      SizedBox(height: AppSpacing.md),
+                      Divider(height: AppSpacing.xl),
                       _Step(
                         number: 3,
                         text:
@@ -236,19 +211,13 @@ class _Step extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 26,
-          height: 26,
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(
-            gradient: AppColors.brandGradient,
-            shape: BoxShape.circle,
-          ),
+        SizedBox(
+          width: 22,
           child: Text(
-            '$number',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
+            '$number.',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -256,7 +225,7 @@ class _Step extends StatelessWidget {
         const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.only(top: 3),
+            padding: const EdgeInsets.only(top: 1),
             child: Text(text, style: Theme.of(context).textTheme.bodyLarge),
           ),
         ),

@@ -9,8 +9,8 @@ import 'package:get/get.dart';
 import '../core/formatters.dart';
 import 'profile_controller.dart';
 
-/// A person in a trip. [uid] is set when they're a SplitShare user (then they
-/// can open the trip too); otherwise they're just a name.
+/// A person in a Lain Dain trip. [uid] is set when they're a SplitShare user
+/// (then they can open the trip too); otherwise they're just a name.
 class TripPerson {
   final String id;
   final String name;
@@ -39,13 +39,15 @@ class TripPerson {
       };
 }
 
-/// Money someone put in during the trip (counts towards the shared total).
+/// Money someone paid during the trip, shared equally between [splitAmong]
+/// (empty = everyone on the trip).
 class TripPayment {
   final String id;
   final String personId;
   final int cents;
   final String note;
   final DateTime at;
+  final List<String> splitAmong;
 
   const TripPayment({
     required this.id,
@@ -53,6 +55,7 @@ class TripPayment {
     required this.cents,
     this.note = '',
     required this.at,
+    this.splitAmong = const [],
   });
 
   factory TripPayment.fromMap(Map<String, dynamic> m) => TripPayment(
@@ -61,6 +64,9 @@ class TripPayment {
         cents: (m['cents'] as num?)?.toInt() ?? 0,
         note: (m['note'] ?? '').toString(),
         at: DateTime.fromMillisecondsSinceEpoch((m['at'] as num?)?.toInt() ?? 0),
+        splitAmong: ((m['splitAmong'] as List?) ?? const [])
+            .map((e) => e.toString())
+            .toList(),
       );
 
   Map<String, dynamic> toMap() => {
@@ -69,11 +75,25 @@ class TripPayment {
         'cents': cents,
         'note': note,
         'at': at.millisecondsSinceEpoch,
+        'splitAmong': splitAmong,
       };
+
+  /// Who shares this payment, in trip order. Unknown ids are ignored and an
+  /// empty selection means everyone.
+  List<String> sharers(List<TripPerson> people) {
+    final ids = people.map((p) => p.id).toList();
+    if (splitAmong.isEmpty) return ids;
+    final set = splitAmong.toSet();
+    final result = ids.where(set.contains).toList();
+    return result.isEmpty ? ids : result;
+  }
+
+  bool splitsWithEveryone(List<TripPerson> people) =>
+      sharers(people).length == people.length;
 }
 
-/// A pay-back between two people after the trip ("Usman paid Ali 3,277.50").
-/// Doesn't change the trip total; moves balances towards zero.
+/// A pay-back between two people ("Usman paid Ali 3,277.50").
+/// Doesn't change what was spent; it settles what one owes the other.
 class TripSettlement {
   final String id;
   final String fromId;
@@ -123,7 +143,7 @@ class TripPersonSummary {
   final int paidCents;
   final int shareCents;
 
-  /// Positive = the group owes them; negative = they owe. Includes pay-backs.
+  /// Positive = others owe them; negative = they owe. Includes pay-backs.
   final int balanceCents;
 
   const TripPersonSummary({
@@ -134,7 +154,82 @@ class TripPersonSummary {
   });
 }
 
-/// Pure trip maths (unit-tested; no Firebase).
+/// What two people owe each other, before and after cancelling out.
+class TripPair {
+  final String aId;
+  final String bId;
+
+  /// What a owes b (b paid for things a shared).
+  final int aOwesB;
+
+  /// What b owes a.
+  final int bOwesA;
+
+  /// Pay-backs already made a→b and b→a.
+  final int aPaidB;
+  final int bPaidA;
+
+  const TripPair({
+    required this.aId,
+    required this.bId,
+    required this.aOwesB,
+    required this.bOwesA,
+    this.aPaidB = 0,
+    this.bPaidA = 0,
+  });
+
+  /// Net after cancelling and pay-backs. Positive = a still owes b.
+  int get net => (aOwesB - aPaidB) - (bOwesA - bPaidA);
+
+  bool get hasHistory => aOwesB > 0 || bOwesA > 0 || aPaidB > 0 || bPaidA > 0;
+
+  /// The remaining transfer, if any.
+  TripTransfer? get transfer {
+    final n = net;
+    if (n > 0) return TripTransfer(aId, bId, n);
+    if (n < 0) return TripTransfer(bId, aId, -n);
+    return null;
+  }
+
+  /// This pair seen from [personId]'s side.
+  TripPairView viewFor(String personId) => personId == aId
+      ? TripPairView(
+          otherId: bId,
+          iOwe: aOwesB,
+          theyOwe: bOwesA,
+          iPaidBack: aPaidB,
+          theyPaidBack: bPaidA,
+        )
+      : TripPairView(
+          otherId: aId,
+          iOwe: bOwesA,
+          theyOwe: aOwesB,
+          iPaidBack: bPaidA,
+          theyPaidBack: aPaidB,
+        );
+}
+
+/// A pair relationship from one person's point of view.
+class TripPairView {
+  final String otherId;
+  final int iOwe;
+  final int theyOwe;
+  final int iPaidBack;
+  final int theyPaidBack;
+
+  const TripPairView({
+    required this.otherId,
+    required this.iOwe,
+    required this.theyOwe,
+    required this.iPaidBack,
+    required this.theyPaidBack,
+  });
+
+  /// Positive = they still owe me; negative = I still owe them.
+  int get net => (theyOwe - theyPaidBack) - (iOwe - iPaidBack);
+}
+
+/// Pure Lain Dain maths (unit-tested; no Firebase). All money in cents.
 class TripMath {
   TripMath._();
 
@@ -148,37 +243,91 @@ class TripMath {
     return List.generate(n, (i) => base + (i < rem ? 1 : 0));
   }
 
+  /// Each sharer's cents for one payment.
+  static Map<String, int> sharesOf(TripPayment pay, List<TripPerson> people) {
+    final sharers = pay.sharers(people);
+    final parts = equalShares(pay.cents, sharers.length);
+    return {for (var i = 0; i < sharers.length; i++) sharers[i]: parts[i]};
+  }
+
   static List<TripPersonSummary> summarise(
     List<TripPerson> people,
     List<TripPayment> payments,
     List<TripSettlement> settlements,
   ) {
     final paid = <String, int>{for (final p in people) p.id: 0};
+    final share = <String, int>{for (final p in people) p.id: 0};
     for (final pay in payments) {
-      if (paid.containsKey(pay.personId)) {
-        paid[pay.personId] = paid[pay.personId]! + pay.cents;
-      }
+      if (!paid.containsKey(pay.personId)) continue;
+      paid[pay.personId] = paid[pay.personId]! + pay.cents;
+      sharesOf(pay, people).forEach((id, c) => share[id] = share[id]! + c);
     }
-    final total = paid.values.fold<int>(0, (a, b) => a + b);
-    final shares = equalShares(total, people.length);
+    final sentBack = <String, int>{};
+    final gotBack = <String, int>{};
+    for (final s in settlements) {
+      sentBack[s.fromId] = (sentBack[s.fromId] ?? 0) + s.cents;
+      gotBack[s.toId] = (gotBack[s.toId] ?? 0) + s.cents;
+    }
+    return [
+      for (final p in people)
+        TripPersonSummary(
+          person: p,
+          paidCents: paid[p.id]!,
+          shareCents: share[p.id]!,
+          balanceCents: paid[p.id]! -
+              share[p.id]! +
+              (sentBack[p.id] ?? 0) -
+              (gotBack[p.id] ?? 0),
+        ),
+    ];
+  }
 
-    final result = <TripPersonSummary>[];
-    for (var i = 0; i < people.length; i++) {
-      final p = people[i];
-      var balance = paid[p.id]! - shares[i];
-      for (final s in settlements) {
-        if (s.fromId == p.id) balance += s.cents; // they paid someone back
-        if (s.toId == p.id) balance -= s.cents; // they were paid back
+  /// Every pair of people with what each owes the other and the result
+  /// after cancelling: "Ali owes Ahad 2,000, Ahad owes Ali 2,120 → Ahad pays
+  /// Ali 120".
+  static List<TripPair> pairs(
+    List<TripPerson> people,
+    List<TripPayment> payments,
+    List<TripSettlement> settlements,
+  ) {
+    final ids = people.map((p) => p.id).toList();
+    final idSet = ids.toSet();
+    final owes = <String, int>{}; // "x|y" = x owes y
+    for (final pay in payments) {
+      if (!idSet.contains(pay.personId)) continue;
+      sharesOf(pay, people).forEach((id, c) {
+        if (id == pay.personId || c == 0) return;
+        final k = '$id|${pay.personId}';
+        owes[k] = (owes[k] ?? 0) + c;
+      });
+    }
+    final paidBack = <String, int>{}; // "x|y" = x paid y back
+    for (final s in settlements) {
+      final k = '${s.fromId}|${s.toId}';
+      paidBack[k] = (paidBack[k] ?? 0) + s.cents;
+    }
+    final result = <TripPair>[];
+    for (var i = 0; i < ids.length; i++) {
+      for (var j = i + 1; j < ids.length; j++) {
+        final a = ids[i], b = ids[j];
+        final pair = TripPair(
+          aId: a,
+          bId: b,
+          aOwesB: owes['$a|$b'] ?? 0,
+          bOwesA: owes['$b|$a'] ?? 0,
+          aPaidB: paidBack['$a|$b'] ?? 0,
+          bPaidA: paidBack['$b|$a'] ?? 0,
+        );
+        if (pair.hasHistory) result.add(pair);
       }
-      result.add(TripPersonSummary(
-        person: p,
-        paidCents: paid[p.id]!,
-        shareCents: shares[i],
-        balanceCents: balance,
-      ));
     }
     return result;
   }
+
+  /// Settle each pair directly — easiest to follow.
+  static List<TripTransfer> pairwisePlan(List<TripPair> pairs) =>
+      pairs.map((p) => p.transfer).whereType<TripTransfer>().toList()
+        ..sort((a, b) => b.cents.compareTo(a.cents));
 
   /// Fewest transfers that bring everyone to zero (greedy: biggest debtor
   /// pays biggest creditor). At most n − 1 transfers.
@@ -210,11 +359,15 @@ class TripMath {
   }
 }
 
-/// Parsed trip document (`trips/{id}`).
+/// Parsed trip document (`trips/{id}`). Derived numbers are computed once
+/// per snapshot so lists stay smooth.
 class Trip {
   final String id;
   final String title;
   final String currencyCode;
+
+  /// Group type name (see `GroupTypes` in core/categories.dart).
+  final String icon;
   final String ownerUid;
   final List<TripPerson> people;
   final List<TripPayment> payments;
@@ -222,10 +375,11 @@ class Trip {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
-  const Trip({
+  Trip({
     required this.id,
     required this.title,
     required this.currencyCode,
+    this.icon = 'Trip',
     required this.ownerUid,
     required this.people,
     required this.payments,
@@ -243,6 +397,7 @@ class Trip {
       id: id,
       title: (d['title'] ?? 'Trip').toString(),
       currencyCode: (d['currencyCode'] ?? 'USD').toString(),
+      icon: (d['icon'] ?? 'Trip').toString(),
       ownerUid: (d['ownerUid'] ?? '').toString(),
       people: list('people').map(TripPerson.fromMap).toList(),
       payments: list('payments').map(TripPayment.fromMap).toList()
@@ -254,18 +409,54 @@ class Trip {
     );
   }
 
-  int get totalCents => payments.fold<int>(0, (a, b) => a + b.cents);
+  late final int totalCents = payments.fold<int>(0, (a, b) => a + b.cents);
 
-  List<TripPersonSummary> get summary =>
+  late final List<TripPersonSummary> summary =
       TripMath.summarise(people, payments, settlements);
 
-  List<TripTransfer> get plan => TripMath.settlePlan(summary);
+  late final List<TripPair> pairs = TripMath.pairs(people, payments, settlements);
+
+  /// Who pays whom, pair by pair (default — easiest to follow).
+  late final List<TripTransfer> plan = TripMath.pairwisePlan(pairs);
+
+  /// Same end result in the fewest possible transfers.
+  late final List<TripTransfer> simplifiedPlan = TripMath.settlePlan(summary);
 
   bool get isSettled => payments.isNotEmpty && plan.isEmpty;
+
+  /// Pair relationships involving [personId], from their side.
+  List<TripPairView> pairsFor(String personId) => [
+        for (final p in pairs)
+          if (p.aId == personId || p.bId == personId) p.viewFor(personId),
+      ];
 
   TripPerson? person(String id) => people.firstWhereOrNull((p) => p.id == id);
 
   String nameOf(String personId) => person(personId)?.name ?? 'Someone';
+}
+
+/// What the signed-in user and one other person owe each other across all
+/// Lain Dain trips. [key] is the other person's uid, or `name:<lowercase>`
+/// for people who aren't on SplitShare.
+class TripCounterparty {
+  final String key;
+  final String name;
+  final String? uid;
+  final String avatarUrl;
+
+  /// Positive = they owe me; negative = I owe them. Per currency.
+  final Map<String, double> byCurrency;
+
+  /// Per-trip breakdown: trip id → (title, signed amount, currency).
+  final List<({String tripId, String title, double amount, String currency})> trips;
+
+  TripCounterparty({
+    required this.key,
+    required this.name,
+    required this.uid,
+    required this.avatarUrl,
+  })  : byCurrency = {},
+        trips = [];
 }
 
 class TripException implements Exception {
@@ -281,7 +472,7 @@ class TripException implements Exception {
 /// can open the same trip.
 ///
 /// Firestore: `trips/{id}` {title, currencyCode, ownerUid, memberUids[],
-/// people[], payments[], settlements[], createdAt, updatedAt}.
+/// people[], payments[{…, splitAmong[]}], settlements[], createdAt, updatedAt}.
 class TripController extends GetxController {
   static TripController get to => Get.find();
 
@@ -325,7 +516,7 @@ class TripController extends GetxController {
   void fetchTrips() {
     final uid = _uid;
     if (uid == null) return;
-    isLoading.value = true;
+    isLoading.value = trips.isEmpty;
     hasError.value = false;
     _sub?.cancel();
     _sub = _col.where('memberUids', arrayContains: uid).snapshots().listen((snap) {
@@ -337,6 +528,7 @@ class TripController extends GetxController {
           if (bt == null) return 1;
           return bt.compareTo(at);
         });
+      _latest = list;
       trips.value = list;
       isLoading.value = false;
     }, onError: (Object e) {
@@ -352,11 +544,15 @@ class TripController extends GetxController {
       .map((d) => d.exists ? Trip.fromDoc(d.id, d.data()!) : null);
 
   /// Creates a trip with the current user as the first person.
-  Future<String> createTrip({required String title, required String currencyCode}) async {
+  Future<String> createTrip({
+    required String title,
+    required String currencyCode,
+    String icon = 'Trip',
+  }) async {
     final uid = _uid ?? FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) throw TripException('Please sign in again.');
     final name = title.trim();
-    if (name.isEmpty) throw TripException('Give your trip a name.');
+    if (name.isEmpty) throw TripException('Give your group a name.');
     final profile = Get.isRegistered<ProfileController>() ? ProfileController.to : null;
     final me = TripPerson(
       id: _newId(),
@@ -367,6 +563,7 @@ class TripController extends GetxController {
     final ref = await _col.add({
       'title': name,
       'currencyCode': currencyCode,
+      'icon': icon,
       'ownerUid': uid,
       'memberUids': [uid],
       'people': [me.toMap()],
@@ -384,32 +581,38 @@ class TripController extends GetxController {
     final ref = _col.doc(tripId);
     await _firestore.runTransaction((tx) async {
       final snap = await tx.get(ref);
-      if (!snap.exists) throw TripException('This trip no longer exists.');
+      if (!snap.exists) throw TripException('This group no longer exists.');
       final data = Map<String, dynamic>.from(snap.data()!);
       for (final key in ['people', 'payments', 'settlements', 'memberUids']) {
         data[key] = List<dynamic>.from((data[key] as List?) ?? const []);
       }
       change(data);
-      data['updatedAt'] = FieldValue.serverTimestamp();
       tx.update(ref, {
         'title': data['title'],
         'currencyCode': data['currencyCode'],
+        'icon': data['icon'] ?? 'Trip',
         'people': data['people'],
         'payments': data['payments'],
         'settlements': data['settlements'],
         'memberUids': data['memberUids'],
-        'updatedAt': data['updatedAt'],
+        'updatedAt': FieldValue.serverTimestamp(),
       });
     }).timeout(const Duration(seconds: 20));
   }
 
-  Future<void> updateDetails(String tripId, {String? title, String? currencyCode}) =>
+  Future<void> updateDetails(
+    String tripId, {
+    String? title,
+    String? currencyCode,
+    String? icon,
+  }) =>
       _mutate(tripId, (d) {
         if (title != null) {
           if (title.trim().isEmpty) throw TripException('The name can\'t be empty.');
           d['title'] = title.trim();
         }
         if (currencyCode != null) d['currencyCode'] = currencyCode;
+        if (icon != null) d['icon'] = icon;
       });
 
   /// Adds people. Entries: {name, uid?, avatarUrl?}. Duplicate app users and
@@ -417,6 +620,7 @@ class TripController extends GetxController {
   Future<int> addPeople(String tripId, List<Map<String, dynamic>> entries) async {
     var added = 0;
     await _mutate(tripId, (d) {
+      added = 0;
       final people = (d['people'] as List).cast<Map>();
       final members = (d['memberUids'] as List).cast<String>();
       for (final e in entries) {
@@ -425,7 +629,8 @@ class TripController extends GetxController {
         final uid = e['uid']?.toString();
         final dup = people.any((p) =>
             (uid != null && p['uid'] == uid) ||
-            (uid == null && p['uid'] == null &&
+            (uid == null &&
+                p['uid'] == null &&
                 p['name'].toString().toLowerCase() == name.toLowerCase()));
         if (dup) continue;
         people.add(TripPerson(
@@ -452,19 +657,25 @@ class TripController extends GetxController {
             .toList();
       });
 
-  /// Removes a person together with their payments and pay-backs.
+  /// Removes a person together with their payments and pay-backs, and takes
+  /// them out of every split.
   Future<void> removePerson(String tripId, String personId) => _mutate(tripId, (d) {
         final people = (d['people'] as List).cast<Map>();
-        if (people.length <= 1) throw TripException('A trip needs at least one person.');
+        if (people.length <= 1) throw TripException('A group needs at least one person.');
         final person = people.firstWhereOrNull((p) => p['id'] == personId);
         if (person == null) return;
         final uid = person['uid']?.toString();
         if (uid != null && uid == d['ownerUid']) {
-          throw TripException('The trip\'s creator can\'t be removed.');
+          throw TripException('The group\'s creator can\'t be removed.');
         }
         d['people'] = people.where((p) => p['id'] != personId).toList();
-        d['payments'] =
-            (d['payments'] as List).where((p) => p is Map && p['personId'] != personId).toList();
+        d['payments'] = (d['payments'] as List)
+            .whereType<Map>()
+            .where((p) => p['personId'] != personId)
+            .map((p) {
+          final among = (p['splitAmong'] as List?) ?? const [];
+          return {...p, 'splitAmong': among.where((x) => x != personId).toList()};
+        }).toList();
         d['settlements'] = (d['settlements'] as List)
             .where((s) => s is Map && s['fromId'] != personId && s['toId'] != personId)
             .toList();
@@ -473,11 +684,13 @@ class TripController extends GetxController {
         }
       });
 
+  /// [splitAmong]: person ids who share the payment (empty = everyone).
   Future<void> addPayment(
     String tripId, {
     required String personId,
     required double amount,
     String note = '',
+    List<String> splitAmong = const [],
   }) {
     final cents = TripMath.toCents(amount);
     if (cents <= 0) throw TripException('Enter an amount above zero.');
@@ -488,6 +701,7 @@ class TripController extends GetxController {
         cents: cents,
         note: note.trim(),
         at: DateTime.now(),
+        splitAmong: splitAmong,
       ).toMap());
     });
   }
@@ -498,13 +712,20 @@ class TripController extends GetxController {
     required String personId,
     required double amount,
     String note = '',
+    List<String> splitAmong = const [],
   }) {
     final cents = TripMath.toCents(amount);
     if (cents <= 0) throw TripException('Enter an amount above zero.');
     return _mutate(tripId, (d) {
       d['payments'] = (d['payments'] as List).map((p) {
         if (p is Map && p['id'] == paymentId) {
-          return {...p, 'personId': personId, 'cents': cents, 'note': note.trim()};
+          return {
+            ...p,
+            'personId': personId,
+            'cents': cents,
+            'note': note.trim(),
+            'splitAmong': splitAmong,
+          };
         }
         return p;
       }).toList();
@@ -537,18 +758,91 @@ class TripController extends GetxController {
 
   bool isOwner(Trip trip) => trip.ownerUid == _uid;
 
+  // Cache for [myBalances], recomputed only when a new snapshot arrives.
+  List<Trip>? _memoTrips;
+  List<Trip> _latest = const [];
+  String? _memoUid;
+  Map<String, TripCounterparty>? _memo;
+
+  /// Marks every open Lain Dain balance with app user [otherUid] as paid,
+  /// across all trips (records a pay-back in each). Returns how many trips
+  /// were updated.
+  Future<int> settleAllWith(String otherUid) async {
+    final uid = _uid;
+    if (uid == null) return 0;
+    var count = 0;
+    for (final trip in trips.toList()) {
+      final me = trip.people.firstWhereOrNull((p) => p.uid == uid);
+      final other = trip.people.firstWhereOrNull((p) => p.uid == otherUid);
+      if (me == null || other == null) continue;
+      final pair = trip.pairs.firstWhereOrNull((p) =>
+          (p.aId == me.id && p.bId == other.id) || (p.aId == other.id && p.bId == me.id));
+      final t = pair?.transfer;
+      if (t == null) continue;
+      await markTransferPaid(trip.id, t);
+      count++;
+    }
+    return count;
+  }
+
+  /// My open Lain Dain balance with each person, across every trip.
+  Map<String, TripCounterparty> myBalances() {
+    final uid = _uid;
+    trips.length; // register Rx dependency for Obx callers
+    if (uid != null && identical(_memoTrips, _latest) && _memoUid == uid) {
+      return _memo!;
+    }
+    final result = <String, TripCounterparty>{};
+    if (uid == null) return result;
+    _memoTrips = _latest;
+    _memoUid = uid;
+    _memo = result;
+    for (final trip in trips) {
+      final me = trip.people.firstWhereOrNull((p) => p.uid == uid);
+      if (me == null) continue;
+      for (final v in trip.pairsFor(me.id)) {
+        if (v.net == 0) continue;
+        final other = trip.person(v.otherId);
+        if (other == null) continue;
+        final key = other.uid ?? 'name:${other.name.trim().toLowerCase()}';
+        final c = result.putIfAbsent(
+          key,
+          () => TripCounterparty(
+            key: key,
+            name: other.name,
+            uid: other.uid,
+            avatarUrl: other.avatarUrl,
+          ),
+        );
+        final amount = v.net / 100;
+        c.byCurrency[trip.currencyCode] =
+            (c.byCurrency[trip.currencyCode] ?? 0) + amount;
+        c.trips.add((
+          tripId: trip.id,
+          title: trip.title,
+          amount: amount,
+          currency: trip.currencyCode,
+        ));
+      }
+    }
+    for (final c in result.values) {
+      c.byCurrency.removeWhere((_, v) => v.abs() < 0.005);
+    }
+    result.removeWhere((_, c) => c.byCurrency.isEmpty);
+    return result;
+  }
+
   /// Plain-text summary for WhatsApp etc.
   static String shareText(Trip trip) {
     String money(int cents) => Fmt.money(cents / 100, currencyCode: trip.currencyCode);
     final b = StringBuffer()
-      ..writeln('🧾 ${trip.title} — SplitShare')
-      ..writeln('Total spent: ${money(trip.totalCents)}'
-          ' · ${trip.people.length} people'
-          ' · ${money(trip.people.isEmpty ? 0 : trip.totalCents ~/ trip.people.length)} each')
+      ..writeln('🧾 ${trip.title} — SplitShare group')
+      ..writeln('Total spent: ${money(trip.totalCents)} · ${trip.people.length} people')
       ..writeln()
       ..writeln('Who paid what:');
     for (final s in trip.summary) {
-      b.writeln('• ${s.person.name}: paid ${money(s.paidCents)}');
+      b.writeln('• ${s.person.name}: paid ${money(s.paidCents)}, '
+          'share ${money(s.shareCents)}');
     }
     b.writeln();
     final plan = trip.plan;

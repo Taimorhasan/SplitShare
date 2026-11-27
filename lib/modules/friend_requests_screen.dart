@@ -180,16 +180,19 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
     int index = 0,
   }) {
     final curved = CurvedAnimation(parent: animation, curve: AppMotion.curve);
-    final card = Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: _RequestCard(
-        request: r,
-        acceptLoading: !removing && _action[_idOf(r)] == 'accept',
-        declineLoading: !removing && _action[_idOf(r)] == 'decline',
-        busy: removing || _ctrl.busyRequests.contains(_idOf(r)),
-        onAccept: () => _accept(r),
-        onDecline: () => _decline(r),
-      ),
+    final card = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _RequestCard(
+          request: r,
+          acceptLoading: !removing && _action[_idOf(r)] == 'accept',
+          declineLoading: !removing && _action[_idOf(r)] == 'decline',
+          busy: removing || _ctrl.busyRequests.contains(_idOf(r)),
+          onAccept: () => _accept(r),
+          onDecline: () => _decline(r),
+        ),
+        const Divider(height: 1),
+      ],
     );
     return SizeTransition(
       sizeFactor: curved,
@@ -235,8 +238,8 @@ class _RequestCard extends StatelessWidget {
     final avatar = (request['fromAvatarUrl'] ?? '').toString();
     final fromUid = (request['fromUid'] ?? '').toString();
 
-    return AppCard(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -259,7 +262,7 @@ class _RequestCard extends StatelessWidget {
                         name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
@@ -271,7 +274,7 @@ class _RequestCard extends StatelessWidget {
                           email,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             color: AppColors.textSecondary,
                           ),
@@ -280,7 +283,7 @@ class _RequestCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.schedule_rounded,
                             size: 13,
                             color: AppColors.textMuted,
@@ -291,7 +294,7 @@ class _RequestCard extends StatelessWidget {
                               _sentLabel(request['sentAt']),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 color: AppColors.textMuted,
                               ),

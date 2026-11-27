@@ -109,6 +109,41 @@ service cloud.firestore {
         && resource.data.ownerUid == request.auth.uid;
     }
 
+    // ---------------- Images (free alternative to Firebase Storage) ----------
+    // Each image is one document holding JPEG bytes (max ~950 KB).
+    function isImageDoc() {
+      return request.resource.data.data is bytes
+        && request.resource.data.data.size() <= 972800;
+    }
+
+    // Profile photos: visible to signed-in users, written only by the owner.
+    match /avatarImages/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isOwner(userId) && isImageDoc();
+      allow delete: if isOwner(userId);
+    }
+
+    // Receipt photos: only the expense's participants.
+    match /receipts/{expenseId} {
+      function onExpense() {
+        return isSignedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/expenses/$(expenseId)).data.involvedUsers;
+      }
+      allow read, delete: if onExpense();
+      allow create, update: if onExpense() && isImageDoc();
+    }
+
+    // ---------------- Crash reports (write-only) ----------------
+    match /errorReports/{reportId} {
+      allow create: if isSignedIn()
+        && request.resource.data.message is string
+        && request.resource.data.message.size() <= 3000
+        && request.resource.data.stack is string
+        && request.resource.data.stack.size() <= 6000
+        && request.resource.data.uid == request.auth.uid;
+      allow read, update, delete: if false;
+    }
+
     // ---------------- Expenses & payments ----------------
     function creatorOf(data) {
       return data.get('createdBy', data.paidBy.uid);

@@ -15,7 +15,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:splitshare/core/app_colors.dart';
 import 'package:splitshare/core/widgets/illustration.dart';
 
 const double _size = 1024;
@@ -101,7 +100,7 @@ void main() {
     );
     await _render(
       tester,
-      Container(decoration: const BoxDecoration(gradient: AppColors.brandGradient)),
+      Container(color: AppLogo.brand),
       'assets/icon/app_icon_background.png',
     );
 

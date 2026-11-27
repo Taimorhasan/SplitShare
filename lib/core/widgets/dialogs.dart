@@ -41,7 +41,7 @@ class AppDialogs {
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 19,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
@@ -51,7 +51,7 @@ class AppDialogs {
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14.5,
                   color: AppColors.textSecondary,
                   height: 1.45,
@@ -126,7 +126,7 @@ class AppDialogs {
                   padding: const EdgeInsets.fromLTRB(24, 18, 24, 6),
                   child: Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
@@ -178,19 +178,18 @@ class AppDialogs {
                   width: 84,
                   height: 84,
                   decoration: BoxDecoration(
-                    gradient: AppColors.positiveGradient,
+                    color: AppColors.positive,
                     shape: BoxShape.circle,
-                    boxShadow: AppShadows.glow(AppColors.positive),
                   ),
-                  child: const Icon(Icons.check_rounded,
-                      color: Colors.white, size: 48),
+                  child: Icon(Icons.check_rounded,
+                      color: AppColors.onPrimary, size: 48),
                 ),
               ),
               const SizedBox(height: 20),
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 19,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
@@ -201,7 +200,7 @@ class AppDialogs {
                 Text(
                   message,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppColors.textSecondary),
+                  style: TextStyle(color: AppColors.textSecondary),
                 ),
               ],
             ],

@@ -421,7 +421,7 @@ class _AddFriendsScreenState extends State<AddFriendsScreen> {
             padding: const EdgeInsets.all(AppSpacing.xl),
             child: Column(
               children: [
-                const IconBadge(
+                IconBadge(
                   icon: Icons.person_search_rounded,
                   color: AppColors.secondary,
                   size: 56,
@@ -463,21 +463,23 @@ class _AddFriendsScreenState extends State<AddFriendsScreen> {
               bottom: AppSpacing.md,
             ),
           ),
-          for (var i = 0; i < results.length; i++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: FadeSlideIn(
-                key: ValueKey('r-${results[i]['uid']}'),
-                index: i,
-                child: _UserRow(
-                  user: results[i],
-                  adding: _adding,
-                  onAdd: _add,
-                  onAccept: _accept,
-                  onTap: () => _openProfile(results[i]),
+          _RuledList(
+            children: [
+              for (var i = 0; i < results.length; i++)
+                FadeSlideIn(
+                  key: ValueKey('r-${results[i]['uid']}'),
+                  index: i,
+                  child: _UserRow(
+                    user: results[i],
+                    adding: _adding,
+                    onAdd: _add,
+                    onAccept: _accept,
+                    card: false,
+                    onTap: () => _openProfile(results[i]),
+                  ),
                 ),
-              ),
-            ),
+            ],
+          ),
         ],
       );
     });
@@ -538,30 +540,25 @@ class _AddFriendsScreenState extends State<AddFriendsScreen> {
           title: 'More ways to connect',
           padding: EdgeInsets.only(top: AppSpacing.xl, bottom: AppSpacing.md),
         ),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            const gap = AppSpacing.md;
-            final half = (constraints.maxWidth - gap) / 2;
-            return Wrap(
-              spacing: gap,
-              runSpacing: gap,
-              children: [
-                for (var i = 0; i < actions.length; i++)
-                  SizedBox(
-                    width: (i == actions.length - 1 && actions.length.isOdd)
-                        ? constraints.maxWidth
-                        : half,
-                    child: FadeSlideIn(
-                      index: i,
-                      child: _ActionCard(
-                        data: actions[i],
-                        wide: i == actions.length - 1 && actions.length.isOdd,
-                      ),
-                    ),
+        AppCard(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+          child: Column(
+            children: [
+              for (var i = 0; i < actions.length; i++) ...[
+                if (i > 0) const Divider(height: 1, indent: 68),
+                FadeSlideIn(
+                  index: i,
+                  child: AppListTile(
+                    icon: actions[i].icon,
+                    iconColor: actions[i].color,
+                    title: actions[i].title,
+                    subtitle: actions[i].subtitle,
+                    onTap: actions[i].onTap,
                   ),
+                ),
               ],
-            );
-          },
+            ],
+          ),
         ),
         Obx(() {
           // Reactive sources for suggestions.
@@ -580,22 +577,24 @@ class _AddFriendsScreenState extends State<AddFriendsScreen> {
                   bottom: AppSpacing.md,
                 ),
               ),
-              for (var i = 0; i < people.length; i++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                  child: FadeSlideIn(
-                    key: ValueKey('s-${people[i]['uid']}'),
-                    index: i + actions.length,
-                    child: _UserRow(
-                      user: people[i],
-                      adding: _adding,
-                      onAdd: _add,
-                      onAccept: _accept,
-                      caption: 'In your groups or expenses',
-                      onTap: () => _openProfile(people[i]),
+              _RuledList(
+                children: [
+                  for (var i = 0; i < people.length; i++)
+                    FadeSlideIn(
+                      key: ValueKey('s-${people[i]['uid']}'),
+                      index: i + actions.length,
+                      child: _UserRow(
+                        user: people[i],
+                        adding: _adding,
+                        onAdd: _add,
+                        onAccept: _accept,
+                        card: false,
+                        caption: 'In your groups or expenses',
+                        onTap: () => _openProfile(people[i]),
+                      ),
                     ),
-                  ),
-                ),
+                ],
+              ),
             ],
           );
         }),
@@ -627,10 +626,7 @@ class _Hint extends StatelessWidget {
         Flexible(
           child: Text(
             text,
-            style: const TextStyle(
-              fontSize: 12.5,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
           ),
         ),
       ],
@@ -654,60 +650,23 @@ class _ActionData {
   });
 }
 
-class _ActionCard extends StatelessWidget {
-  final _ActionData data;
-  final bool wide;
-  const _ActionCard({required this.data, this.wide = false});
+/// Rows in one hairline-ruled block.
+class _RuledList extends StatelessWidget {
+  final List<Widget> children;
+  const _RuledList({required this.children});
 
   @override
   Widget build(BuildContext context) {
-    final title = Text(
-      data.title,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: const TextStyle(
-        fontSize: 15,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textPrimary,
-      ),
-    );
-    final subtitle = Text(
-      data.subtitle,
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-      style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
-    );
-
     return AppCard(
-      onTap: data.onTap,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: wide
-          ? Row(
-              children: [
-                IconBadge(icon: data.icon, color: data.color),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [title, const SizedBox(height: 2), subtitle],
-                  ),
-                ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textMuted,
-                ),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                IconBadge(icon: data.icon, color: data.color),
-                const SizedBox(height: AppSpacing.md),
-                title,
-                const SizedBox(height: 2),
-                subtitle,
-              ],
-            ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      child: Column(
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const Divider(height: 1),
+            children[i],
+          ],
+        ],
+      ),
     );
   }
 }
@@ -758,7 +717,7 @@ class _UserRow extends StatelessWidget {
                 name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
@@ -770,7 +729,7 @@ class _UserRow extends StatelessWidget {
                   subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     color: AppColors.textSecondary,
                   ),
@@ -782,8 +741,8 @@ class _UserRow extends StatelessWidget {
         const SizedBox(width: AppSpacing.sm),
         Obx(() {
           if (ctrl.isAlreadyFriend(uid)) {
-            return const StatusPill(
-              label: 'FRIENDS',
+            return StatusPill(
+              label: 'Friends',
               color: AppColors.positive,
               icon: Icons.check_rounded,
             );
@@ -802,8 +761,8 @@ class _UserRow extends StatelessWidget {
             );
           }
           if (ctrl.sentRequests.contains(uid)) {
-            return const StatusPill(
-              label: 'REQUESTED',
+            return StatusPill(
+              label: 'Requested',
               color: AppColors.textSecondary,
               icon: Icons.schedule_rounded,
             );
@@ -824,7 +783,7 @@ class _UserRow extends StatelessWidget {
       return Pressable(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           child: row,
         ),
       );
@@ -866,9 +825,9 @@ class _MyQrSheet extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(AppSpacing.xl),
             decoration: BoxDecoration(
-              gradient: AppColors.heroGradient,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(AppRadius.lg),
-              boxShadow: AppShadows.glow(AppColors.primary),
+              border: Border.all(color: AppColors.border),
             ),
             child: Column(
               children: [
@@ -882,7 +841,6 @@ class _MyQrSheet extends StatelessWidget {
                         name: name,
                         imageUrl: profile.avatarUrl.value,
                         radius: 22,
-                        ring: true,
                       ),
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
@@ -893,8 +851,8 @@ class _MyQrSheet extends StatelessWidget {
                               name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 16,
                               ),
@@ -904,7 +862,7 @@ class _MyQrSheet extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.8),
+                                color: AppColors.textSecondary,
                                 fontSize: 12.5,
                               ),
                             ),
@@ -915,11 +873,13 @@ class _MyQrSheet extends StatelessWidget {
                   );
                 }),
                 const SizedBox(height: AppSpacing.lg),
+                // Fixed dark-on-white in both themes so any camera can read it.
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(AppRadius.md),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: QrImageView(
                     data: 'splitshare://user/$uid',
@@ -928,13 +888,13 @@ class _MyQrSheet extends StatelessWidget {
                     backgroundColor: Colors.white,
                     errorCorrectionLevel: QrErrorCorrectLevel.M,
                     semanticsLabel: 'Your SplitShare QR code',
-                    eyeStyle: const QrEyeStyle(
+                    eyeStyle: QrEyeStyle(
                       eyeShape: QrEyeShape.circle,
-                      color: AppColors.primaryDark,
+                      color: AppLogo.ink,
                     ),
-                    dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleStyle: QrDataModuleStyle(
                       dataModuleShape: QrDataModuleShape.circle,
-                      color: AppColors.textPrimary,
+                      color: AppLogo.ink,
                     ),
                   ),
                 ),
@@ -942,7 +902,7 @@ class _MyQrSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
-          const Text(
+          Text(
             'Your friend code',
             style: TextStyle(
               fontSize: 13,
@@ -964,12 +924,11 @@ class _MyQrSheet extends StatelessWidget {
                   child: SelectableText(
                     uid,
                     maxLines: 1,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 13.5,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
-                      letterSpacing: 0.4,
                     ),
                   ),
                 ),
@@ -1207,7 +1166,7 @@ class _ContactMatchesSheet extends StatelessWidget {
         ),
         child: Column(
           children: [
-            const AppIllustration(
+            AppIllustration(
               icon: Icons.contacts_rounded,
               color: AppColors.positive,
               size: 130,
@@ -1247,8 +1206,7 @@ class _ContactMatchesSheet extends StatelessWidget {
           AppSpacing.xxl,
         ),
         itemCount: matches.length,
-        separatorBuilder: (_, _) =>
-            const Divider(height: 1, color: AppColors.border),
+        separatorBuilder: (_, _) => Divider(height: 1, color: AppColors.border),
         itemBuilder: (_, i) => _UserRow(
           user: matches[i],
           adding: adding,

@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- SplitShare brand indigo (AppColors.primary) -->
-    <color name="splash_background">#4F46E5</color>
+    <!-- Launch screen ground. Light: Chai & Pista cream. The night variant
+         (values-night) is espresso. MainActivity switches to the app's own
+         Appearance setting as soon as the app starts. -->
+    <color name="splash_background">#F6F1E7</color>
+    <color name="splash_light">#F6F1E7</color>
+    <color name="splash_dark">#1C1813</color>
 </resources>

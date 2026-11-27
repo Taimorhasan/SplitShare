@@ -61,7 +61,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   void _retryExpenses() {
     final id = _id;
     if (id == null) return;
-    setState(() => _expensesStream = ExpenseController.to.groupExpensesStream(id));
+    setState(
+      () => _expensesStream = ExpenseController.to.groupExpensesStream(id),
+    );
   }
 
   Future<void> _refreshExpenses() async {
@@ -129,7 +131,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     final heroContent = media.textScaler.scale(196);
     final expanded = toolbar + heroContent;
     final type = GroupTypes.of(group['icon']?.toString());
-    final dark = Color.lerp(type.color, AppColors.primaryDark, 0.55)!;
     final name = (group['name'] ?? 'Group').toString();
 
     return Scaffold(
@@ -140,9 +141,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
             pinned: true,
             expandedHeight: expanded,
             toolbarHeight: toolbar,
-            backgroundColor: dark,
+            backgroundColor: AppColors.background,
             surfaceTintColor: Colors.transparent,
-            systemOverlayStyle: SystemUiOverlayStyle.light,
+            systemOverlayStyle: AppColors.isDark
+                ? SystemUiOverlayStyle.light
+                : SystemUiOverlayStyle.dark,
             automaticallyImplyLeading: false,
             leadingWidth: 64,
             leading: Padding(
@@ -152,14 +155,15 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                   icon: Icons.arrow_back_ios_new_rounded,
                   tooltip: 'Back',
                   size: 40,
-                  color: Colors.white,
-                  background: Colors.white.withValues(alpha: 0.18),
                   onPressed: _close,
                 ),
               ),
             ),
             actions: [
-              _OverflowMenu(onSelected: (a) => _onMenu(a, group), isCreator: GroupController.to.isCreator(group)),
+              _OverflowMenu(
+                onSelected: (a) => _onMenu(a, group),
+                isCreator: GroupController.to.isCreator(group),
+              ),
               const SizedBox(width: 16),
             ],
             flexibleSpace: LayoutBuilder(
@@ -170,24 +174,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                 return Stack(
                   fit: StackFit.expand,
                   children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [type.color, dark],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      right: -40,
-                      top: -30,
-                      child: Icon(
-                        type.icon,
-                        size: 200,
-                        color: Colors.white.withValues(alpha: 0.06),
-                      ),
-                    ),
                     // Collapsed title
                     Positioned(
                       left: 72,
@@ -203,8 +189,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                               name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -244,9 +230,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                 dividerColor: Colors.transparent,
                 labelColor: AppColors.textPrimary,
                 unselectedLabelColor: AppColors.textSecondary,
-                labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                unselectedLabelStyle:
-                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                labelStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
                 overlayColor: const WidgetStatePropertyAll(Colors.transparent),
                 splashFactory: NoSplash.splashFactory,
                 tabs: const [
@@ -281,30 +272,26 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
       child: Row(
         children: [
           Expanded(
-            child: _QuickAction(
-              icon: Icons.add_rounded,
+            child: AppButton(
               label: 'Add expense',
-              color: AppColors.primary,
-              filled: true,
-              onTap: () => _addExpense(group),
+              height: 46,
+              onPressed: () => _addExpense(group),
             ),
           ),
-          const SizedBox(width: AppSpacing.md),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
-            child: _QuickAction(
-              icon: Icons.handshake_rounded,
+            child: AppButton.outline(
               label: 'Settle up',
-              color: AppColors.positive,
-              onTap: () => Get.toNamed(AppRoutes.settleUp),
+              height: 46,
+              onPressed: () => Get.toNamed(AppRoutes.settleUp),
             ),
           ),
-          const SizedBox(width: AppSpacing.md),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
-            child: _QuickAction(
-              icon: Icons.account_balance_wallet_rounded,
+            child: AppButton.outline(
               label: 'Balances',
-              color: AppColors.secondary,
-              onTap: () => _tabs.animateTo(1),
+              height: 46,
+              onPressed: () => _tabs.animateTo(1),
             ),
           ),
         ],
@@ -313,12 +300,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   }
 
   void _addExpense(Map<String, dynamic> group) {
-    AppNav.addExpense(arguments: {
-      'groupId': _id,
-      'groupName': (group['name'] ?? 'Group').toString(),
-      'currencyCode': (group['currencyCode'] ?? 'USD').toString(),
-      'members': GroupController.membersOf(group),
-    });
+    AppNav.addExpense(
+      arguments: {
+        'groupId': _id,
+        'groupName': (group['name'] ?? 'Group').toString(),
+        'currencyCode': (group['currencyCode'] ?? 'USD').toString(),
+        'members': GroupController.membersOf(group),
+      },
+    );
   }
 
   // ---------- Expenses tab ----------
@@ -355,7 +344,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                 EmptyState(
                   icon: Icons.receipt_long_rounded,
                   title: 'No expenses yet',
-                  message: 'Add the first shared expense and SplitShare will '
+                  message:
+                      'Add the first shared expense and SplitShare will '
                       'keep track of who owes whom.',
                   illustrationSize: 140,
                   actionLabel: 'Add expense',
@@ -378,16 +368,15 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
         Fmt.toDate(e['date']) ?? Fmt.toDate(e['createdAt']) ?? DateTime.now();
     final sorted = [...expenses]..sort((a, b) => when(b).compareTo(when(a)));
 
-    // Flatten into headers + rows.
-    final items = <Object>[];
-    String? last;
+    // Group by day: a plain day label, then one ruled block of rows.
+    final days = <({String label, List<Map<String, dynamic>> items})>[];
     for (final e in sorted) {
       final label = Fmt.dayGroup(when(e));
-      if (label != last) {
-        items.add(label);
-        last = label;
+      if (days.isEmpty || days.last.label != label) {
+        days.add((label: label, items: [e]));
+      } else {
+        days.last.items.add(e);
       }
-      items.add(e);
     }
 
     return RefreshIndicator(
@@ -400,34 +389,46 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
           AppSpacing.page,
           AppSpacing.xxxl,
         ),
-        itemCount: items.length,
+        itemCount: days.length,
         itemBuilder: (context, i) {
-          final item = items[i];
-          if (item is String) {
-            return Padding(
-              padding: EdgeInsets.only(
-                top: i == 0 ? AppSpacing.sm : AppSpacing.lg,
-                bottom: AppSpacing.sm,
-                left: 2,
-              ),
-              child: Text(
-                item.toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.6,
-                  color: AppColors.textMuted,
+          final day = days[i];
+          return FadeSlideIn(
+            key: ValueKey('day-${day.label}'),
+            index: i,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: EdgeInsets.only(
+                    top: i == 0 ? AppSpacing.sm : AppSpacing.xl,
+                    bottom: AppSpacing.sm,
+                    left: 2,
+                  ),
+                  child: Text(
+                    day.label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ),
-              ),
-            );
-          }
-          final e = item as Map<String, dynamic>;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: FadeSlideIn(
-              key: ValueKey(e['id']),
-              index: i,
-              child: ExpenseTile(expense: e),
+                AppCard(
+                  padding: EdgeInsets.zero,
+                  child: Column(
+                    children: [
+                      for (var j = 0; j < day.items.length; j++) ...[
+                        if (j > 0) const Divider(height: 1),
+                        ExpenseTile(
+                          key: ValueKey(day.items[j]['id']),
+                          expense: day.items[j],
+                          card: false,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
           );
         },
@@ -483,17 +484,18 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
       }
 
       // Members first (in group order), then anyone who left but still has a balance.
-      final rows = <Map<String, dynamic>>[
-        for (final m in members)
-          if (m['uid'] != me) m,
-        for (final uid in byMember.keys)
-          if (uid != me && !members.any((m) => m['uid'] == uid))
-            {'uid': uid, 'name': ctrl.nameFor(uid), 'avatarUrl': ''},
-      ]..sort((a, b) {
-          final ab = byMember.containsKey(a['uid']) ? 0 : 1;
-          final bb = byMember.containsKey(b['uid']) ? 0 : 1;
-          return ab.compareTo(bb);
-        });
+      final rows =
+          <Map<String, dynamic>>[
+            for (final m in members)
+              if (m['uid'] != me) m,
+            for (final uid in byMember.keys)
+              if (uid != me && !members.any((m) => m['uid'] == uid))
+                {'uid': uid, 'name': ctrl.nameFor(uid), 'avatarUrl': ''},
+          ]..sort((a, b) {
+            final ab = byMember.containsKey(a['uid']) ? 0 : 1;
+            final bb = byMember.containsKey(b['uid']) ? 0 : 1;
+            return ab.compareTo(bb);
+          });
 
       return ListView(
         padding: const EdgeInsets.fromLTRB(
@@ -506,12 +508,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
           AppCard(
             child: Row(
               children: [
-                const IconBadge(
-                  icon: Icons.account_balance_wallet_rounded,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(width: AppSpacing.md),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Your position in this group',
                     style: TextStyle(
@@ -523,36 +520,44 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Flexible(
-                  child: BalanceLabel(byCurrency: mine, preferredCurrency: currency),
+                  child: BalanceLabel(
+                    byCurrency: mine,
+                    preferredCurrency: currency,
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          const Padding(
-            padding: EdgeInsets.only(left: 2, bottom: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.xl),
+          Padding(
+            padding: const EdgeInsets.only(left: 2, bottom: AppSpacing.sm),
             child: Text(
-              'WITH EACH MEMBER',
+              'With each member',
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6,
-                color: AppColors.textMuted,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
               ),
             ),
           ),
-          for (var i = 0; i < rows.length; i++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: FadeSlideIn(
-                index: i,
-                child: _BalanceRow(
-                  person: rows[i],
-                  byCurrency: byMember[rows[i]['uid']] ?? const {},
-                  currency: currency,
-                ),
-              ),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                for (var i = 0; i < rows.length; i++) ...[
+                  if (i > 0) const Divider(height: 1, indent: 68),
+                  FadeSlideIn(
+                    index: i,
+                    child: _BalanceRow(
+                      person: rows[i],
+                      byCurrency: byMember[rows[i]['uid']] ?? const {},
+                      currency: currency,
+                    ),
+                  ),
+                ],
+              ],
             ),
+          ),
         ],
       );
     });
@@ -564,12 +569,13 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     final members = GroupController.membersOf(group);
     final me = ExpenseController.to.currentUid;
     final creator = group['createdBy']?.toString();
-    final sorted = [...members]..sort((a, b) {
+    final sorted = [...members]
+      ..sort((a, b) {
         if (a['uid'] == me) return -1;
         if (b['uid'] == me) return 1;
         return (a['name'] ?? '').toString().toLowerCase().compareTo(
-              (b['name'] ?? '').toString().toLowerCase(),
-            );
+          (b['name'] ?? '').toString().toLowerCase(),
+        );
       });
 
     return ListView(
@@ -589,16 +595,15 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
             onTap: () => _showAddMembers(group),
           ),
         ),
-        const SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: AppSpacing.xl),
         Padding(
           padding: const EdgeInsets.only(left: 2, bottom: AppSpacing.sm),
           child: Text(
-            '${members.length} ${members.length == 1 ? 'MEMBER' : 'MEMBERS'}',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.6,
-              color: AppColors.textMuted,
+            '${members.length} ${members.length == 1 ? 'member' : 'members'}',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
             ),
           ),
         ),
@@ -608,9 +613,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
             children: [
               for (var i = 0; i < sorted.length; i++) ...[
                 if (i > 0)
-                  const Divider(height: 1, indent: 70, color: AppColors.border),
-                _memberRow(sorted[i], isMe: sorted[i]['uid'] == me,
-                    isCreator: sorted[i]['uid'] == creator),
+                  Divider(height: 1, indent: 70, color: AppColors.border),
+                _memberRow(
+                  sorted[i],
+                  isMe: sorted[i]['uid'] == me,
+                  isCreator: sorted[i]['uid'] == creator,
+                ),
               ],
             ],
           ),
@@ -619,25 +627,31 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     );
   }
 
-  Widget _memberRow(Map<String, dynamic> m,
-      {required bool isMe, required bool isCreator}) {
+  Widget _memberRow(
+    Map<String, dynamic> m, {
+    required bool isMe,
+    required bool isCreator,
+  }) {
     final uid = (m['uid'] ?? '').toString();
     final name = (m['name'] ?? 'Member').toString();
     final email = (m['email'] ?? '').toString();
     final isFriend = !isMe && FriendController.to.isAlreadyFriend(uid);
     return InkWell(
       onTap: isFriend
-          ? () => AppNav.openFriend(uid, data: {
-                'name': name,
-                'avatarUrl': m['avatarUrl'],
-                'email': email,
-              })
+          ? () => AppNav.openFriend(
+              uid,
+              data: {'name': name, 'avatarUrl': m['avatarUrl'], 'email': email},
+            )
           : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         child: Row(
           children: [
-            AppAvatar(name: name, imageUrl: m['avatarUrl']?.toString(), radius: 21),
+            AppAvatar(
+              name: name,
+              imageUrl: m['avatarUrl']?.toString(),
+              radius: 21,
+            ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
@@ -650,7 +664,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                           isMe ? '$name (You)' : name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textPrimary,
@@ -664,7 +678,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                       email,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12.5,
                         color: AppColors.textSecondary,
                       ),
@@ -674,16 +688,19 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
             ),
             if (isCreator) ...[
               const SizedBox(width: AppSpacing.sm),
-              const StatusPill(
+              StatusPill(
                 label: 'Creator',
                 color: AppColors.warning,
                 icon: Icons.star_rounded,
               ),
             ],
             if (isFriend)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(left: 4),
-                child: Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                child: Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textMuted,
+                ),
               ),
           ],
         ),
@@ -711,7 +728,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   void _showEdit(Map<String, dynamic> group) {
     AppDialogs.sheet<void>(
       title: 'Edit group',
-      child: _EditGroupSheet(groupId: _id!, group: group),
+      child: EditGroupSheet(groupId: _id!, group: group),
     );
   }
 
@@ -759,11 +776,13 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
           : BalanceDirectionX.fromNet(mine[currency] ?? mine.values.first);
       buf
         ..writeln()
-        ..writeln(dir == BalanceDirection.settled
-            ? 'Overall I\'m settled up.'
-            : dir == BalanceDirection.owedToYou
-                ? 'Overall I\'m owed ${Fmt.multi(mine, preferred: currency)}.'
-                : 'Overall I owe ${Fmt.multi(mine, preferred: currency)}.');
+        ..writeln(
+          dir == BalanceDirection.settled
+              ? 'Overall I\'m settled up.'
+              : dir == BalanceDirection.owedToYou
+              ? 'Overall I\'m owed ${Fmt.multi(mine, preferred: currency)}.'
+              : 'Overall I owe ${Fmt.multi(mine, preferred: currency)}.',
+        );
     }
     buf
       ..writeln()
@@ -782,7 +801,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     final name = (group['name'] ?? 'this group').toString();
     final ok = await AppDialogs.confirm(
       title: 'Leave "$name"?',
-      message: 'You\'ll stop seeing this group. You can only leave once your '
+      message:
+          'You\'ll stop seeing this group. You can only leave once your '
           'balance in it is settled.',
       confirmLabel: 'Leave',
       destructive: true,
@@ -811,7 +831,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     final name = (group['name'] ?? 'this group').toString();
     final ok = await AppDialogs.confirm(
       title: 'Delete "$name"?',
-      message: 'The group will be removed for every member. Its expenses stay '
+      message:
+          'The group will be removed for every member. Its expenses stay '
           'in everyone\'s history and balances. This can\'t be undone.',
       confirmLabel: 'Delete',
       destructive: true,
@@ -861,7 +882,12 @@ class _Hero extends StatelessWidget {
         children: [
           Row(
             children: [
-              IconBadge(icon: type.icon, color: Colors.white, size: 56, iconSize: 28),
+              IconBadge(
+                icon: type.icon,
+                color: type.color,
+                size: 56,
+                iconSize: 28,
+              ),
               const SizedBox(width: AppSpacing.lg),
               Expanded(
                 child: Column(
@@ -871,11 +897,11 @@ class _Hero extends StatelessWidget {
                       (group['name'] ?? 'Group').toString(),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
                         fontSize: 23,
                         height: 1.15,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         letterSpacing: -0.3,
                       ),
                     ),
@@ -885,7 +911,7 @@ class _Hero extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
+                        color: AppColors.textSecondary,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -896,18 +922,19 @@ class _Hero extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
+          // A ruled line on the page, not a floating box.
           Container(
-            padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
+            padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              boxShadow: AppShadows.medium,
+              border: Border.symmetric(
+                horizontal: BorderSide(color: AppColors.border),
+              ),
             ),
             child: Row(
               children: [
                 AvatarStack(people: members, radius: 13, max: 4),
                 const SizedBox(width: AppSpacing.sm),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Your balance',
                     maxLines: 1,
@@ -939,53 +966,6 @@ class _Hero extends StatelessWidget {
   }
 }
 
-class _QuickAction extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final bool filled;
-  final VoidCallback onTap;
-
-  const _QuickAction({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-    this.filled = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      onTap: onTap,
-      gradient: filled ? AppColors.brandGradient : null,
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconBadge(
-            icon: icon,
-            color: filled ? Colors.white : color,
-            size: 38,
-            iconSize: 20,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: filled ? Colors.white : AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 enum _MenuAction { edit, addMembers, share, leave, delete }
 
 class _OverflowMenu extends StatelessWidget {
@@ -1005,11 +985,19 @@ class _OverflowMenu extends StatelessWidget {
       height: 48,
       child: Row(
         children: [
-          Icon(icon, size: 20, color: destructive ? AppColors.error : AppColors.textSecondary),
+          Icon(
+            icon,
+            size: 20,
+            color: destructive ? AppColors.error : AppColors.textSecondary,
+          ),
           const SizedBox(width: AppSpacing.md),
           Text(
             label,
-            style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: color),
+            style: TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
           ),
         ],
       ),
@@ -1025,25 +1013,41 @@ class _OverflowMenu extends StatelessWidget {
       surfaceTintColor: Colors.transparent,
       elevation: 8,
       offset: const Offset(0, 48),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
       itemBuilder: (_) => [
         _item(_MenuAction.edit, Icons.edit_rounded, 'Edit group'),
-        _item(_MenuAction.addMembers, Icons.person_add_alt_1_rounded, 'Add members'),
+        _item(
+          _MenuAction.addMembers,
+          Icons.person_add_alt_1_rounded,
+          'Add members',
+        ),
         _item(_MenuAction.share, Icons.ios_share_rounded, 'Share summary'),
         const PopupMenuDivider(),
-        _item(_MenuAction.leave, Icons.logout_rounded, 'Leave group', destructive: true),
+        _item(
+          _MenuAction.leave,
+          Icons.logout_rounded,
+          'Leave group',
+          destructive: true,
+        ),
         if (isCreator)
-          _item(_MenuAction.delete, Icons.delete_outline_rounded, 'Delete group',
-              destructive: true),
+          _item(
+            _MenuAction.delete,
+            Icons.delete_outline_rounded,
+            'Delete group',
+            destructive: true,
+          ),
       ],
       child: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.18),
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: AppColors.border),
         ),
-        child: const Icon(Icons.more_horiz_rounded, color: Colors.white),
+        child: Icon(Icons.more_horiz_rounded, color: AppColors.textPrimary),
       ),
     );
   }
@@ -1061,10 +1065,24 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => _height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    // Must be exactly [_height] tall: a pinned header whose child is shorter
+    // than its extent throws "layoutExtent exceeds paintExtent" and blanks
+    // the whole screen.
     return Container(
+      height: _height,
       color: AppColors.background,
-      padding: const EdgeInsets.fromLTRB(AppSpacing.page, 8, AppSpacing.page, 8),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.page,
+        8,
+        AppSpacing.page,
+        8,
+      ),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surfaceMuted,
@@ -1097,42 +1115,54 @@ class _BalanceRow extends StatelessWidget {
     final uid = (person['uid'] ?? '').toString();
     final name = (person['name'] ?? 'Member').toString();
     final hasBalance = byCurrency.isNotEmpty;
-    return AppCard(
+    return InkWell(
       onTap: hasBalance
           ? () => Get.toNamed(AppRoutes.settleUp, arguments: {'uid': uid})
           : null,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          AppAvatar(name: name, imageUrl: person['avatarUrl']?.toString(), radius: 21),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                if (hasBalance)
-                  const Text(
-                    'Tap to settle up',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                  ),
-              ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            AppAvatar(
+              name: name,
+              imageUrl: person['avatarUrl']?.toString(),
+              radius: 21,
             ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Flexible(
-            child: BalanceLabel(byCurrency: byCurrency, preferredCurrency: currency),
-          ),
-        ],
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  if (hasBalance)
+                    Text(
+                      'Tap to settle up',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Flexible(
+              child: BalanceLabel(
+                byCurrency: byCurrency,
+                preferredCurrency: currency,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1142,19 +1172,20 @@ class _BalanceRow extends StatelessWidget {
 // Sheets
 // =====================================================================
 
-class _EditGroupSheet extends StatefulWidget {
+class EditGroupSheet extends StatefulWidget {
   final String groupId;
   final Map<String, dynamic> group;
-  const _EditGroupSheet({required this.groupId, required this.group});
+  const EditGroupSheet({super.key, required this.groupId, required this.group});
 
   @override
-  State<_EditGroupSheet> createState() => _EditGroupSheetState();
+  State<EditGroupSheet> createState() => EditGroupSheetState();
 }
 
-class _EditGroupSheetState extends State<_EditGroupSheet> {
+class EditGroupSheetState extends State<EditGroupSheet> {
   final _formKey = GlobalKey<FormState>();
-  late final _nameCtrl =
-      TextEditingController(text: (widget.group['name'] ?? '').toString());
+  late final _nameCtrl = TextEditingController(
+    text: (widget.group['name'] ?? '').toString(),
+  );
   late String _type = GroupTypes.of(widget.group['icon']?.toString()).name;
   late String _currency = (widget.group['currencyCode'] ?? 'USD').toString();
   bool _saving = false;
@@ -1242,7 +1273,7 @@ class _EditGroupSheetState extends State<_EditGroupSheet> {
               ],
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Changing the currency only affects new expenses.',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
@@ -1317,7 +1348,7 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const IconBadge(
+              IconBadge(
                 icon: Icons.person_search_rounded,
                 color: AppColors.primary,
                 size: 60,
@@ -1332,7 +1363,7 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Add friends on SplitShare to invite them to this group.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.textSecondary),
@@ -1380,7 +1411,7 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
                       child: Text(
                         'No friends match "${_query.trim()}"',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: AppColors.textSecondary),
+                        style: TextStyle(color: AppColors.textSecondary),
                       ),
                     )
                   : ListView.builder(
@@ -1413,13 +1444,14 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
                                 const SizedBox(width: AppSpacing.md),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         name,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
                                           color: AppColors.textPrimary,
@@ -1430,7 +1462,7 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
                                           email,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 12.5,
                                             color: AppColors.textSecondary,
                                           ),
@@ -1445,7 +1477,9 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   onChanged: (_) => setState(() {
-                                    sel ? _selected.remove(uid) : _selected.add(uid);
+                                    sel
+                                        ? _selected.remove(uid)
+                                        : _selected.add(uid);
                                   }),
                                 ),
                               ],
@@ -1461,7 +1495,7 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
                 label: _selected.isEmpty
                     ? 'Select friends to add'
                     : 'Add ${_selected.length} '
-                        '${_selected.length == 1 ? 'member' : 'members'}',
+                          '${_selected.length == 1 ? 'member' : 'members'}',
                 icon: Icons.group_add_rounded,
                 loading: _saving,
                 onPressed: _selected.isEmpty ? null : _add,
@@ -1480,16 +1514,16 @@ class _SheetLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(left: 2, bottom: AppSpacing.sm),
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.only(left: 2, bottom: AppSpacing.sm),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 13.5,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
+      ),
+    ),
+  );
 }
 
 class _Chip extends StatelessWidget {
@@ -1513,7 +1547,10 @@ class _Chip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: AppMotion.fast,
-        padding: EdgeInsets.symmetric(horizontal: icon == null ? 14 : 12, vertical: 9),
+        padding: EdgeInsets.symmetric(
+          horizontal: icon == null ? 14 : 12,
+          vertical: 9,
+        ),
         decoration: BoxDecoration(
           color: selected ? color.withValues(alpha: 0.12) : AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -1526,7 +1563,11 @@ class _Chip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 17, color: selected ? color : AppColors.textSecondary),
+              Icon(
+                icon,
+                size: 17,
+                color: selected ? color : AppColors.textSecondary,
+              ),
               const SizedBox(width: 6),
             ],
             Text(

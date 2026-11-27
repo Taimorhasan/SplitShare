@@ -76,7 +76,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Welcome back',
-                              style: theme.textTheme.headlineMedium),
+                              style: theme.textTheme.headlineMedium
+                                  ?.copyWith(color: AppColors.textPrimary)),
                           const SizedBox(height: AppSpacing.xs),
                           Text(
                             'Sign in to see your balances and keep splitting.',
@@ -170,8 +171,10 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-/// Gradient header with the logo and a floating illustration.
-/// Shared by the auth screens.
+/// Quiet auth header on the page ground: optional back button, then the
+/// SplitShare mark. The screen's title follows it in ink.
+/// Shared by the auth screens. [icon] and [orbitIcons] are kept for API
+/// compatibility and no longer drawn.
 class AuthHeader extends StatelessWidget {
   final IconData icon;
   final List<IconData> orbitIcons;
@@ -186,59 +189,27 @@ class AuthHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.sizeOf(context).height;
-    final illustration = (height * 0.17).clamp(110.0, 170.0);
     final canPop = Navigator.of(context).canPop();
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: AppColors.heroGradient,
-        borderRadius: BorderRadius.vertical(
-          bottom: Radius.circular(AppRadius.xl + 8),
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-              AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xxl),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  if (showBack && canPop) ...[
-                    AppIconButton(
-                      icon: Icons.arrow_back_ios_new_rounded,
-                      tooltip: 'Back',
-                      size: 40,
-                      color: Colors.white,
-                      background: Colors.white.withValues(alpha: 0.16),
-                      onPressed: () => Get.back(),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                  ],
-                  const AppLogo(size: 40, withShadow: false),
-                  const SizedBox(width: AppSpacing.sm),
-                  const Text(
-                    'SplitShare',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                ],
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.page, AppSpacing.md, AppSpacing.page, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (showBack && canPop) ...[
+              AppIconButton(
+                icon: Icons.arrow_back_ios_new_rounded,
+                tooltip: 'Back',
+                size: 40,
+                onPressed: () => Get.back(),
               ),
-              const SizedBox(height: AppSpacing.md),
-              AppIllustration(
-                icon: icon,
-                color: AppColors.accent,
-                secondaryColor: AppColors.primary,
-                size: illustration,
-                orbitIcons: orbitIcons,
-              ),
-            ],
-          ),
+              const SizedBox(height: AppSpacing.lg),
+            ] else
+              const SizedBox(height: AppSpacing.xxl),
+            const AppLogo(size: 56, withShadow: false),
+          ],
         ),
       ),
     );
@@ -253,13 +224,13 @@ class AuthOrDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Expanded(child: Divider(color: AppColors.border, thickness: 1)),
+        Expanded(child: Divider(color: AppColors.border, thickness: 1)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           child: Text('or continue with',
               style: Theme.of(context).textTheme.bodySmall),
         ),
-        const Expanded(child: Divider(color: AppColors.border, thickness: 1)),
+        Expanded(child: Divider(color: AppColors.border, thickness: 1)),
       ],
     );
   }
@@ -332,14 +303,13 @@ class _SocialButton extends StatelessWidget {
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(color: AppColors.border),
-              boxShadow: AppShadows.soft,
             ),
             alignment: Alignment.center,
             child: AnimatedSwitcher(
               duration: AppMotion.fast,
               child: loading
-                  ? const SizedBox(
-                      key: ValueKey('loading'),
+                  ? SizedBox(
+                      key: const ValueKey('loading'),
                       width: 22,
                       height: 22,
                       child: CircularProgressIndicator(
@@ -356,7 +326,7 @@ class _SocialButton extends StatelessWidget {
                             label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.textPrimary,
                               fontSize: 15,
                               fontWeight: FontWeight.w600,

@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-27T09:21:32Z",
+  "title": "Design System: SplitShare",
+  "extensions": {
+    "colorMeta": {
+      "pistachio": {
+        "role": "primary",
+        "displayName": "Pistachio",
+        "canonical": "#3C6B22",
+        "tonalRamp": [
+          "#E1EECF",
+          "#D5E8B5",
+          "#3C6B22",
+          "#A9D18E",
+          "#2C3B1E"
+        ]
+      },
+      "pomegranate": {
+        "role": "secondary",
+        "displayName": "Pomegranate",
+        "canonical": "#B3263E",
+        "tonalRamp": [
+          "#F6DDE1",
+          "#B3263E",
+          "#FF8E9C"
+        ]
+      },
+      "saffron": {
+        "role": "tertiary",
+        "displayName": "Saffron",
+        "canonical": "#E39B17"
+      },
+      "cream": {
+        "role": "neutral",
+        "displayName": "Cream Page",
+        "canonical": "#F6F1E7",
+        "tonalRamp": [
+          "#FFFDF8",
+          "#F6F1E7",
+          "#EFE8DA",
+          "#E5DCCB",
+          "#8F887A",
+          "#6E6857",
+          "#23201A"
+        ]
+      },
+      "chai": {
+        "role": "neutral",
+        "displayName": "Night Chai",
+        "canonical": "#15130F",
+        "tonalRamp": [
+          "#15130F",
+          "#1F1C16",
+          "#29251D",
+          "#332E25",
+          "#A39C8A",
+          "#F1EBDD"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "total": {
+        "displayName": "Total",
+        "purpose": "The one main figure per screen, inside KhataTotal."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All running text; tabular figures everywhere."
+      }
+    },
+    "shadows": [
+      {
+        "name": "sheet",
+        "value": "0 8px 24px rgba(0,0,0,0.12) (night 0.5)",
+        "purpose": "Only for surfaces floating over the page: toasts, sheets, loading overlay."
+      }
+    ],
+    "motion": [
+      {
+        "name": "fast",
+        "value": "150ms easeOutCubic",
+        "purpose": "Button/press feedback, small swaps."
+      },
+      {
+        "name": "normal",
+        "value": "220ms easeOutCubic",
+        "purpose": "State changes, nav pill, sheets."
+      },
+      {
+        "name": "list-entrance",
+        "value": "300ms, stagger 30ms capped at 6, first screen only",
+        "purpose": "FadeSlideIn on a freshly opened screen; scrolled-in rows appear instantly."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "phone",
+        "value": "portrait phones, text scale clamped 0.85-1.3"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Balance Card",
+      "kind": "custom",
+      "refersTo": "balance-card",
+      "description": "The screen's one total on a pistachio block, paise smaller, with owed/owe split bar.",
+      "html": "<div class=\"bc\"><span class=\"l\">Overall, you get back</span><span class=\"a\">Rs 3,652<small>.50</small></span><i class=\"bar\"><b></b></i></div>",
+      "css": ".bc{background:#D5E8B5;border-radius:26px;padding:22px;font-family:Figtree,system-ui;display:flex;flex-direction:column;gap:6px;color:#1F2A14}.l{font-weight:600;color:#46582C}.a{font-size:42px;font-weight:800;letter-spacing:-1.2px}.a small{font-size:24px;opacity:.7}.bar{display:block;height:10px;border-radius:5px;background:#B3263E;overflow:hidden}.bar b{display:block;height:100%;width:96%;background:#2F5F20}"
+    },
+    {
+      "name": "Nav Pill",
+      "kind": "navigation",
+      "refersTo": "nav-pill",
+      "description": "Floating dark pill, icon-only, pistachio capsule on the selected tab, saffron add button.",
+      "html": "<nav class=\"np\"><i class=\"on\"></i><i></i><b>+</b><i></i><i></i></nav>",
+      "css": ".np{display:inline-flex;gap:4px;align-items:center;background:#23201A;border-radius:31px;padding:8px}.np i{width:56px;height:46px;border-radius:23px}.np i.on{background:#D5E8B5}.np b{width:58px;height:46px;border-radius:23px;background:#E39B17;color:#23201A;display:grid;place-items:center;font-size:24px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Chai & Pista",
+    "overview": "Warm cream page, soft rounded cards, pistachio for money coming back, pomegranate for money you owe, one saffron add button. Dark mode is the same on roasted-chai brown.",
+    "keyCharacteristics": [
+      "Cream and pistachio, no gradients",
+      "Figtree with tabular figures",
+      "One balance card per screen",
+      "Floating dark nav pill"
+    ],
+    "rules": [
+      {
+        "name": "Words With Colour",
+        "body": "Money direction always says owes you / you owe.",
+        "section": "colors"
+      },
+      {
+        "name": "Fill Not Shadow",
+        "body": "Cards separate by fill and a 1px border.",
+        "section": "elevation"
+      },
+      {
+        "name": "Brand Mark",
+        "body": "A coin split in two (saffron + pistachio halves, offset) on an espresso #1C1813 tile; the splash uses the same espresso.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "Read colours from AppColors getters",
+      "One balance card per screen"
+    ],
+    "donts": [
+      "No gradients, glows, card shadows or emoji",
+      "No Colors.white on coloured fills"
+    ]
+  }
+}

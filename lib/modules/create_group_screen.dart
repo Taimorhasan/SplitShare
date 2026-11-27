@@ -139,11 +139,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             splitType: 'Equally',
             notes: '',
             splitWith: friendMembers
-                .map((m) => {
-                      'uid': m['uid'],
-                      'name': m['name'],
-                      'avatarUrl': m['avatarUrl'],
-                    })
+                .map(
+                  (m) => {
+                    'uid': m['uid'],
+                    'name': m['name'],
+                    'avatarUrl': m['avatarUrl'],
+                  },
+                )
                 .toList(),
             splitValuesByUid: const {},
             currencyCode: _currency,
@@ -164,24 +166,27 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       } else {
         AppToast.success('"$name" is ready to go.', title: 'Group created');
       }
-      Get.offNamed(AppRoutes.groupDetail, arguments: {
-        'id': id,
-        'name': name,
-        'icon': _type,
-        'currencyCode': _currency,
-        'createdBy': me,
-        'members': [?me, ..._selected],
-        'memberDetails': [
-          if (me != null)
-            {
-              'uid': me,
-              'name': profile.name.value,
-              'email': profile.email.value,
-              'avatarUrl': profile.avatarUrl.value,
-            },
-          ...friendMembers,
-        ],
-      });
+      Get.offNamed(
+        AppRoutes.groupDetail,
+        arguments: {
+          'id': id,
+          'name': name,
+          'icon': _type,
+          'currencyCode': _currency,
+          'createdBy': me,
+          'members': [?me, ..._selected],
+          'memberDetails': [
+            if (me != null)
+              {
+                'uid': me,
+                'name': profile.name.value,
+                'email': profile.email.value,
+                'avatarUrl': profile.avatarUrl.value,
+              },
+            ...friendMembers,
+          ],
+        },
+      );
     } on GroupException catch (e) {
       if (mounted) setState(() => _saving = false);
       AppToast.error(e.message, title: 'Couldn\'t create group');
@@ -250,7 +255,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         bottomNavigationBar: Container(
           decoration: BoxDecoration(
             color: AppColors.surface,
-            boxShadow: AppShadows.soft,
+            border: Border(top: BorderSide(color: AppColors.border)),
           ),
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.page,
@@ -277,39 +282,41 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   // ---------- Sections ----------
 
   Widget _label(String text, {String? trailing}) => Padding(
-        padding: const EdgeInsets.only(left: 2, bottom: AppSpacing.sm),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                text,
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
+    padding: const EdgeInsets.only(left: 2, bottom: AppSpacing.sm),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
             ),
-            if (trailing != null)
-              Text(
-                trailing,
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
-              ),
-          ],
+          ),
         ),
-      );
+        if (trailing != null)
+          Text(
+            trailing,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            ),
+          ),
+      ],
+    ),
+  );
 
   Widget _buildPreview() {
     final style = GroupTypes.of(_type);
     final profile = ProfileController.to;
     final name = _nameCtrl.text.trim();
     final people = <Map<String, dynamic>>[
-      {'name': profile.name.value.isEmpty ? 'You' : profile.name.value,
-        'avatarUrl': profile.avatarUrl.value},
+      {
+        'name': profile.name.value.isEmpty ? 'You' : profile.name.value,
+        'avatarUrl': profile.avatarUrl.value,
+      },
       for (final uid in _selected)
         {
           'name': (_friend(uid)?['name'] ?? 'Member').toString(),
@@ -321,16 +328,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       curve: AppMotion.curve,
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        gradient: LinearGradient(
-          colors: [
-            style.color,
-            Color.lerp(style.color, AppColors.primaryDark, 0.5)!,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: AppShadows.glow(style.color),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
@@ -340,7 +340,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             child: IconBadge(
               key: ValueKey(_type),
               icon: style.icon,
-              color: Colors.white,
+              color: style.color,
               size: 56,
               iconSize: 28,
             ),
@@ -356,8 +356,10 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 19,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white.withValues(alpha: name.isEmpty ? 0.6 : 1),
+                    fontWeight: FontWeight.w700,
+                    color: name.isEmpty
+                        ? AppColors.textMuted
+                        : AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -369,7 +371,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w500,
-                    color: Colors.white.withValues(alpha: 0.85),
+                    color: AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -448,19 +450,23 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             trailing: _selected.isEmpty ? null : '${_selected.length} selected',
           ),
           if (friendCtrl.isLoading.value && friends.isEmpty)
-            const SkeletonList(count: 3, shrinkWrap: true, padding: EdgeInsets.zero)
+            const SkeletonList(
+              count: 3,
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+            )
           else if (friends.isEmpty)
             AppCard(
               child: Column(
                 children: [
-                  const IconBadge(
+                  IconBadge(
                     icon: Icons.person_add_alt_1_rounded,
                     color: AppColors.primary,
                     size: 52,
                     iconSize: 26,
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  const Text(
+                  Text(
                     'No friends to add yet',
                     style: TextStyle(
                       fontSize: 15.5,
@@ -469,7 +475,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     'Add friends first, then invite them here. You can also '
                     'create the group now and add members later.',
                     textAlign: TextAlign.center,
@@ -495,9 +501,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               Wrap(
                 spacing: AppSpacing.sm,
                 runSpacing: AppSpacing.sm,
-                children: [
-                  for (final uid in _selected) _selectedChip(uid),
-                ],
+                children: [for (final uid in _selected) _selectedChip(uid)],
               ),
               const SizedBox(height: AppSpacing.md),
             ],
@@ -517,14 +521,14 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                       child: Text(
                         'No friends match "${_query.trim()}"',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: AppColors.textSecondary),
+                        style: TextStyle(color: AppColors.textSecondary),
                       ),
                     )
                   : Column(
                       children: [
                         for (var i = 0; i < filtered.length; i++) ...[
                           if (i > 0)
-                            const Divider(
+                            Divider(
                               height: 1,
                               indent: 68,
                               color: AppColors.border,
@@ -552,7 +556,11 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AppAvatar(name: name, imageUrl: f?['avatarUrl']?.toString(), radius: 12),
+          AppAvatar(
+            name: name,
+            imageUrl: f?['avatarUrl']?.toString(),
+            radius: 12,
+          ),
           const SizedBox(width: 6),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 120),
@@ -560,7 +568,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               Fmt.firstName(name),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: AppColors.primary,
@@ -570,9 +578,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           InkWell(
             onTap: () => _toggle(uid),
             customBorder: const CircleBorder(),
-            child: const Padding(
+            child: Padding(
               padding: EdgeInsets.all(4),
-              child: Icon(Icons.close_rounded, size: 16, color: AppColors.primary),
+              child: Icon(
+                Icons.close_rounded,
+                size: 16,
+                color: AppColors.primary,
+              ),
             ),
           ),
         ],
@@ -591,7 +603,11 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
-            AppAvatar(name: name, imageUrl: f['avatarUrl']?.toString(), radius: 20),
+            AppAvatar(
+              name: name,
+              imageUrl: f['avatarUrl']?.toString(),
+              radius: 20,
+            ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
@@ -601,7 +617,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
@@ -612,7 +628,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                       email,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12.5,
                         color: AppColors.textSecondary,
                       ),
@@ -624,7 +640,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               value: selected,
               onChanged: uid.isEmpty ? null : (_) => _toggle(uid),
               activeColor: AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
             ),
           ],
         ),
@@ -640,10 +658,12 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     if (!enabled) {
       helper = 'Select at least one member to add a starting expense.';
     } else if (amount == null) {
-      helper = 'Optional. Something you already paid for the group — it\'s '
+      helper =
+          'Optional. Something you already paid for the group — it\'s '
           'split equally between all $people members.';
     } else {
-      helper = 'You paid ${Fmt.money(amount, currencyCode: _currency)}, split '
+      helper =
+          'You paid ${Fmt.money(amount, currencyCode: _currency)}, split '
           'equally between $people people — everyone\'s share is '
           '${Fmt.money(amount / people, currencyCode: _currency)}.';
     }
@@ -706,7 +726,11 @@ class _ChoiceChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 17, color: selected ? color : AppColors.textSecondary),
+              Icon(
+                icon,
+                size: 17,
+                color: selected ? color : AppColors.textSecondary,
+              ),
               const SizedBox(width: 6),
             ],
             Text(

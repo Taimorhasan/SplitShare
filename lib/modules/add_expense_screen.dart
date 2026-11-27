@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
@@ -401,7 +400,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
           data: theme.copyWith(
             colorScheme: theme.colorScheme.copyWith(
               primary: AppColors.primary,
-              onPrimary: Colors.white,
+              onPrimary: AppColors.onPrimary,
               surface: AppColors.surface,
               onSurface: AppColors.textPrimary,
             ),
@@ -409,7 +408,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               backgroundColor: AppColors.surface,
               surfaceTintColor: Colors.transparent,
               headerBackgroundColor: AppColors.primary,
-              headerForegroundColor: Colors.white,
+              headerForegroundColor: AppColors.onPrimary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppRadius.xl),
               ),
@@ -512,8 +511,10 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     try {
       final image = await ImagePicker().pickImage(
         source: source == 'camera' ? ImageSource.camera : ImageSource.gallery,
-        imageQuality: 70,
-        maxWidth: 1600,
+        // Readable but small enough for the free Firestore image store.
+        imageQuality: 60,
+        maxWidth: 1280,
+        maxHeight: 1600,
       );
       if (image != null && mounted) {
         setState(() => _receipt = File(image.path));
@@ -651,7 +652,10 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                   ),
                   children: [
                     if (_groupId != null) ...[
-                      Center(child: _groupChip()),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: _groupChip(),
+                      ),
                       const SizedBox(height: AppSpacing.md),
                     ],
                     _amountCard(),
@@ -708,14 +712,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.groups_rounded, size: 16, color: AppColors.primary),
+          Icon(Icons.groups_rounded, size: 16, color: AppColors.primary),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
               'in ${_groupName ?? 'group'}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
@@ -727,80 +731,90 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     );
   }
 
+  /// The amount, written on the page ground and closed by the khata's red
+  /// double rule.
   Widget _amountCard() {
     final symbol = Currencies.symbolFor(_currency);
-    return AppCard(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+    final rule = AppColors.rule;
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Total amount',
             style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                symbol,
-                style: const TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minWidth: 80),
-                  child: IntrinsicWidth(
-                    child: TextField(
-                      controller: _amountCtrl,
-                      autofocus: !_isEdit,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [amountInputFormatter],
-                      textAlign: TextAlign.center,
-                      textInputAction: TextInputAction.next,
-                      style: const TextStyle(
-                        fontSize: 44,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -1,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: '0.00',
-                        hintStyle: TextStyle(
-                          fontSize: 44,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.border,
-                          letterSpacing: -1,
-                        ),
-                        filled: false,
-                        isCollapsed: true,
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 4),
+          const SizedBox(height: 2),
+          IntrinsicWidth(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      symbol,
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 6),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 110, maxWidth: 260),
+                      child: IntrinsicWidth(
+                        child: TextField(
+                          controller: _amountCtrl,
+                          autofocus: !_isEdit,
+                          keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [amountInputFormatter],
+                          textInputAction: TextInputAction.next,
+                          style: TextStyle(
+                            fontSize: 42,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                            letterSpacing: -0.8,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: '0.00',
+                            hintStyle: TextStyle(
+                              fontSize: 42,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textMuted,
+                              letterSpacing: -0.8,
+                            ),
+                            filled: false,
+                            isCollapsed: true,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                Container(height: 1.6, color: rule),
+                const SizedBox(height: 2.4),
+                Container(height: 1.6, color: rule),
+              ],
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
           Pressable(
             onTap: _pickCurrency,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-              ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -809,15 +823,15 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       '$_currency · ${Currencies.names[_currency] ?? _currency}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w600,
-                        fontSize: 13,
+                        fontSize: 13.5,
                       ),
                     ),
                   ),
                   const SizedBox(width: 2),
-                  const Icon(Icons.expand_more_rounded, size: 18, color: AppColors.primary),
+                  Icon(Icons.expand_more_rounded, size: 18, color: AppColors.primary),
                 ],
               ),
             ),
@@ -856,7 +870,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
-          const IconBadge(
+          IconBadge(
             icon: Icons.calendar_today_rounded,
             color: AppColors.primary,
             size: 40,
@@ -866,14 +880,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
           Expanded(
             child: Text(
               isToday ? 'Today, ${Fmt.date(_date)}' : Fmt.date(_date),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
               ),
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+          Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
         ],
       ),
     );
@@ -886,7 +900,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_people.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(bottom: AppSpacing.md, left: 2),
               child: Text(
                 'Add at least one person to share this expense with.',
@@ -913,7 +927,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                     color: AppColors.primaryLight,
                     borderRadius: BorderRadius.circular(AppRadius.pill),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.person_add_alt_1_rounded, size: 17, color: AppColors.primary),
@@ -955,14 +969,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               _payerUid == _me ? 'You paid' : '$name paid',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
               ),
             ),
           ),
-          const Text(
+          Text(
             'Change',
             style: TextStyle(
               color: AppColors.primary,
@@ -970,7 +984,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               fontSize: 13.5,
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 20),
+          Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 20),
         ],
       ),
     );
@@ -997,7 +1011,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                   decoration: BoxDecoration(
                     color: type == _splitType ? AppColors.surface : Colors.transparent,
                     borderRadius: BorderRadius.circular(AppRadius.sm),
-                    boxShadow: type == _splitType ? AppShadows.soft : null,
+                    border: Border.all(
+                      color: type == _splitType
+                          ? AppColors.border
+                          : Colors.transparent,
+                    ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -1061,7 +1079,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         children: [
           Row(
             children: [
-              const IconBadge(
+              IconBadge(
                 icon: Icons.east_rounded,
                 color: AppColors.positive,
                 size: 30,
@@ -1071,7 +1089,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               Expanded(
                 child: Text(
                   headline,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -1081,7 +1099,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
             ],
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             "No split — the payer's own share is zero.",
             style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
           ),
@@ -1097,7 +1115,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                 shares == null
                     ? '—'
                     : Fmt.money(shares[i] / 100, currencyCode: _currency),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
@@ -1128,7 +1146,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               uids.length < 2
                   ? 'Add people to see each share'
                   : 'Split equally between ${uids.length} people',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textSecondary,
@@ -1142,7 +1160,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                 avatarUrl: _avatarOf(uids[i]),
                 trailing: Text(
                   shares == null ? '—' : Fmt.money(shares[i] / 100, currencyCode: _currency),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -1227,7 +1245,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                   inputFormatters: [amountInputFormatter],
                   textAlign: TextAlign.end,
                   textInputAction: TextInputAction.next,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -1253,7 +1271,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       return AppCard(
         onTap: () => setState(() => _notesOpen = true),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: const Row(
+        child: Row(
           children: [
             IconBadge(
               icon: Icons.sticky_note_2_rounded,
@@ -1310,7 +1328,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       return AppCard(
         onTap: _pickReceipt,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: const Row(
+        child: Row(
           children: [
             IconBadge(
               icon: Icons.receipt_long_rounded,
@@ -1347,13 +1365,13 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
     final Widget thumb = _receipt != null
         ? Image.file(_receipt!, fit: BoxFit.cover, width: 64, height: 64)
-        : CachedNetworkImage(
-            imageUrl: _existingReceiptUrl!,
+        : AppImage(
+            url: _existingReceiptUrl!,
             fit: BoxFit.cover,
             width: 64,
             height: 64,
-            placeholder: (_, _) => const Skeleton(width: 64, height: 64, radius: 0),
-            errorWidget: (_, _, _) => const ColoredBox(
+            placeholder: const Skeleton(width: 64, height: 64, radius: 0),
+            error: ColoredBox(
               color: AppColors.surfaceMuted,
               child: Icon(Icons.broken_image_rounded, color: AppColors.textMuted),
             ),
@@ -1372,7 +1390,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Receipt attached',
                   style: TextStyle(
                     fontSize: 15,
@@ -1383,7 +1401,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                 const SizedBox(height: 2),
                 Text(
                   _receipt != null ? 'Uploads when you save' : 'Saved with this expense',
-                  style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                  style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -1413,7 +1431,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
-        boxShadow: AppShadows.soft,
+        border: Border(top: BorderSide(color: AppColors.border)),
       ),
       padding: const EdgeInsets.fromLTRB(AppSpacing.page, 12, AppSpacing.page, 12),
       child: SafeArea(
@@ -1449,36 +1467,29 @@ class _CategoryChip extends StatelessWidget {
       child: AnimatedContainer(
         duration: AppMotion.normal,
         curve: AppMotion.curve,
-        padding: const EdgeInsets.fromLTRB(8, 7, 14, 7),
+        padding: const EdgeInsets.fromLTRB(10, 8, 14, 8),
         decoration: BoxDecoration(
-          color: selected ? style.color : AppColors.surface,
+          color: selected ? AppColors.primary : AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: selected ? style.color : AppColors.border),
-          boxShadow: selected ? AppShadows.glow(style.color) : null,
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: selected ? Colors.white.withValues(alpha: 0.22) : style.tint,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                style.icon,
-                size: 16,
-                color: selected ? Colors.white : style.color,
-              ),
+            Icon(
+              style.icon,
+              size: 17,
+              color: selected ? AppColors.onPrimary : style.color,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Text(
               style.name,
               style: TextStyle(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w600,
-                color: selected ? Colors.white : AppColors.textPrimary,
+                color: selected ? AppColors.onPrimary : AppColors.textPrimary,
               ),
             ),
           ],
@@ -1518,7 +1529,7 @@ class _PersonChip extends StatelessWidget {
               name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
@@ -1532,7 +1543,7 @@ class _PersonChip extends StatelessWidget {
             child: InkResponse(
               onTap: onRemove,
               radius: 18,
-              child: const Padding(
+              child: Padding(
                 padding: EdgeInsets.all(4),
                 child: Icon(Icons.close_rounded, size: 17, color: AppColors.textSecondary),
               ),
@@ -1575,7 +1586,7 @@ class _ShareRow extends StatelessWidget {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -1584,7 +1595,7 @@ class _ShareRow extends StatelessWidget {
                 if (caption != null)
                   Text(
                     caption!,
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                   ),
               ],
             ),
@@ -1635,7 +1646,7 @@ class _SelectRow extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
@@ -1646,7 +1657,7 @@ class _SelectRow extends StatelessWidget {
                         subtitle!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                        style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
                       ),
                   ],
                 ),
@@ -1654,7 +1665,7 @@ class _SelectRow extends StatelessWidget {
               AnimatedOpacity(
                 duration: AppMotion.fast,
                 opacity: selected ? 1 : 0,
-                child: const Icon(Icons.check_circle_rounded, color: AppColors.primary),
+                child: Icon(Icons.check_circle_rounded, color: AppColors.primary),
               ),
             ],
           ),
@@ -1689,7 +1700,7 @@ class _CurrencySheet extends StatelessWidget {
             ),
             child: Text(
               Currencies.symbolFor(code),
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
                 fontSize: 15,
@@ -1862,7 +1873,7 @@ class _PeoplePickerSheetState extends State<_PeoplePickerSheet> {
                                         p['name'].toString(),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
                                           color: AppColors.textPrimary,
@@ -1873,7 +1884,7 @@ class _PeoplePickerSheetState extends State<_PeoplePickerSheet> {
                                           p['email'].toString(),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 12.5,
                                             color: AppColors.textSecondary,
                                           ),

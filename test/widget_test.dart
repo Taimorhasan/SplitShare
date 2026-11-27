@@ -160,6 +160,73 @@ void main() {
       expect(TripMath.settlePlan(after), isEmpty);
     });
 
+    test('pairs cancel out: each pair shows what remains after netting', () {
+      final pairs = TripMath.pairs(people, payments, const []);
+      int netBetween(String debtor, String creditor) {
+        final p = pairs.firstWhere((x) =>
+            (x.aId == debtor && x.bId == creditor) ||
+            (x.aId == creditor && x.bId == debtor));
+        return p.aId == debtor ? p.net : -p.net;
+      }
+
+      // Ali owes Ahad 2,000 (¼ of 8,000); Ahad owes Ali 1,875 (¼ of 7,500).
+      final ahadAli = pairs.firstWhere((x) => {x.aId, x.bId}.containsAll(['Ahad', 'Ali']))
+          .viewFor('Ahad');
+      expect(ahadAli.theyOwe, 200000);
+      expect(ahadAli.iOwe, 187500);
+      expect(ahadAli.net, 12500); // Ali pays Ahad 125 after cancelling
+
+      expect(netBetween('Usman', 'Ahad'), 177750);
+      expect(netBetween('Taimoor', 'Ahad'), 187500);
+      expect(netBetween('Usman', 'Ali'), 165250);
+      expect(netBetween('Taimoor', 'Ali'), 175000);
+      expect(netBetween('Taimoor', 'Usman'), 9750);
+
+      // Pair nets add up to each person's overall balance.
+      final summary = TripMath.summarise(people, payments, const []);
+      final ahad = summary.firstWhere((s) => s.person.id == 'Ahad');
+      final ahadFromPairs = pairs
+          .where((x) => x.aId == 'Ahad' || x.bId == 'Ahad')
+          .fold<int>(0, (a, x) => a + x.viewFor('Ahad').net);
+      expect(ahadFromPairs, ahad.balanceCents);
+    });
+
+    test('split among only selected people', () {
+      // Ahad paid 900 for a dinner only Ali, Usman and Ahad had.
+      final dinner = TripPayment(
+        id: 'd',
+        personId: 'Ahad',
+        cents: 90000,
+        at: DateTime(2026),
+        splitAmong: const ['Ahad', 'Ali', 'Usman'],
+      );
+      final s = TripMath.summarise(people, [dinner], const []);
+      final share = {for (final x in s) x.person.id: x.shareCents};
+      expect(share['Taimoor'], 0);
+      expect(share['Ali'], 30000);
+      final plan = TripMath.pairwisePlan(TripMath.pairs(people, [dinner], const []));
+      expect(plan.map((t) => t.toString()).toSet(), {'Ali→Ahad:30000', 'Usman→Ahad:30000'});
+    });
+
+    test('paying each pair back settles everything', () {
+      final plan = TripMath.pairwisePlan(TripMath.pairs(people, payments, const []));
+      final paid = [
+        for (final t in plan)
+          TripSettlement(
+            id: t.toString(),
+            fromId: t.fromId,
+            toId: t.toId,
+            cents: t.cents,
+            at: DateTime(2026),
+          ),
+      ];
+      expect(TripMath.pairwisePlan(TripMath.pairs(people, payments, paid)), isEmpty);
+      expect(
+        TripMath.summarise(people, payments, paid).every((x) => x.balanceCents == 0),
+        isTrue,
+      );
+    });
+
     test('odd totals still split to the cent', () {
       final shares = TripMath.equalShares(1000, 3);
       expect(shares.fold<int>(0, (a, b) => a + b), 1000);

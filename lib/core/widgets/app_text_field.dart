@@ -96,7 +96,7 @@ class _AppTextFieldState extends State<AppTextField> {
       onTap: widget.onTap,
       autofocus: widget.autofocus,
       autovalidateMode: AutovalidateMode.onUserInteraction,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 15.5,
         fontWeight: FontWeight.w500,
         color: AppColors.textPrimary,
@@ -124,7 +124,7 @@ class _AppTextFieldState extends State<AppTextField> {
           padding: const EdgeInsets.only(left: 2, bottom: AppSpacing.sm),
           child: Text(
             widget.label!,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13.5,
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
@@ -158,7 +158,7 @@ class AppSearchField extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        boxShadow: AppShadows.soft,
+        border: Border.all(color: AppColors.border),
       ),
       child: TextField(
         controller: controller,
@@ -188,7 +188,7 @@ class AppSearchField extends StatelessWidget {
           enabledBorder: InputBorder.none,
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
-            borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
+            borderSide: BorderSide(color: AppColors.primary, width: 1.4),
           ),
           fillColor: Colors.transparent,
           contentPadding: const EdgeInsets.symmetric(vertical: 14),

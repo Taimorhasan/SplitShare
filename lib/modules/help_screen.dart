@@ -13,16 +13,14 @@ class _Faq {
 class _FaqSection {
   final String title;
   final IconData icon;
-  final Color color;
   final List<_Faq> items;
-  const _FaqSection(this.title, this.icon, this.color, this.items);
+  const _FaqSection(this.title, this.icon, this.items);
 }
 
 const _sections = <_FaqSection>[
   _FaqSection(
     'Balances',
     Icons.account_balance_wallet_outlined,
-    AppColors.primary,
     [
       _Faq(
         'How are balances calculated?',
@@ -44,7 +42,7 @@ const _sections = <_FaqSection>[
       ),
     ],
   ),
-  _FaqSection('Expenses', Icons.receipt_long_outlined, AppColors.secondary, [
+  _FaqSection('Expenses', Icons.receipt_long_outlined, [
     _Faq(
       'What split types can I use?',
       'Equally divides the amount evenly between everyone involved. Percent '
@@ -65,7 +63,7 @@ const _sections = <_FaqSection>[
           'payments, so editing or deleting one updates everyone\'s balance.',
     ),
   ]),
-  _FaqSection('Settling up', Icons.handshake_outlined, AppColors.positive, [
+  _FaqSection('Settling up', Icons.handshake_outlined, [
     _Faq(
       'How do I settle up?',
       'Open Settle up, pick a person, then record a partial payment or settle '
@@ -78,7 +76,7 @@ const _sections = <_FaqSection>[
           'and then record it here.',
     ),
   ]),
-  _FaqSection('Groups', Icons.groups_2_outlined, AppColors.accent, [
+  _FaqSection('Groups', Icons.groups_2_outlined, [
     _Faq(
       'How do groups work?',
       'Create a group for a trip, home or event and add your friends as '
@@ -95,7 +93,7 @@ const _sections = <_FaqSection>[
       'Only the person who created the group can delete it.',
     ),
   ]),
-  _FaqSection('Friends', Icons.people_alt_outlined, AppColors.warning, [
+  _FaqSection('Friends', Icons.people_alt_outlined, [
     _Faq(
       'How do I add friends?',
       'Search for people by name or email address, scan their QR code, or use '
@@ -111,7 +109,6 @@ const _sections = <_FaqSection>[
   _FaqSection(
     'Notifications',
     Icons.notifications_none_rounded,
-    AppColors.info,
     [
       _Faq(
         'What notifications will I get?',
@@ -126,7 +123,7 @@ const _sections = <_FaqSection>[
       ),
     ],
   ),
-  _FaqSection('Privacy & data', Icons.shield_outlined, AppColors.negative, [
+  _FaqSection('Privacy & data', Icons.shield_outlined, [
     _Faq(
       'Who can see my details?',
       'Your phone number is private and only visible to you. Your name, email '
@@ -175,7 +172,7 @@ class _HelpScreenState extends State<HelpScreen> {
                 )
                 .toList();
       if (items.isNotEmpty) {
-        result.add(_FaqSection(s.title, s.icon, s.color, items));
+        result.add(_FaqSection(s.title, s.icon, items));
       }
     }
     return result;
@@ -303,47 +300,27 @@ class _HelpHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      gradient: AppColors.heroGradient,
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.lg,
-        AppSpacing.md,
-        AppSpacing.lg,
-      ),
-      child: Row(
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'How can we help?',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 21,
-                    fontWeight: FontWeight.w800,
-                  ),
+          Text(
+            'How can we help?',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'Answers about balances, splitting, settling up, groups '
-                  'and your privacy.',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.85),
-                    fontSize: 13.5,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
           ),
-          const AppIllustration(
-            icon: Icons.support_agent_rounded,
-            color: AppColors.accent,
-            secondaryColor: AppColors.primaryLight,
-            badgeIcon: Icons.question_mark_rounded,
-            size: 104,
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Answers about balances, splitting, settling up, groups '
+            'and your privacy.',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -365,7 +342,7 @@ class _SectionCard extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(
             2,
-            AppSpacing.lg,
+            AppSpacing.xxl,
             2,
             AppSpacing.sm,
           ),
@@ -373,7 +350,7 @@ class _SectionCard extends StatelessWidget {
             children: [
               IconBadge(
                 icon: section.icon,
-                color: section.color,
+                color: AppColors.primary,
                 size: 30,
                 iconSize: 16,
               ),
@@ -397,18 +374,17 @@ class _SectionCard extends StatelessWidget {
               children: [
                 for (var i = 0; i < section.items.length; i++) ...[
                   if (i > 0)
-                    const Divider(
+                    Divider(
                       height: 1,
                       thickness: 1,
                       indent: 16,
                       endIndent: 16,
-                      color: AppColors.surfaceMuted,
+                      color: AppColors.border,
                     ),
                   _FaqTile(
                     // Re-key so search results open expanded.
                     key: ValueKey('${section.items[i].question}-$expandAll'),
                     faq: section.items[i],
-                    color: section.color,
                     initiallyExpanded: expandAll,
                   ),
                 ],
@@ -423,13 +399,11 @@ class _SectionCard extends StatelessWidget {
 
 class _FaqTile extends StatelessWidget {
   final _Faq faq;
-  final Color color;
   final bool initiallyExpanded;
 
   const _FaqTile({
     super.key,
     required this.faq,
-    required this.color,
     required this.initiallyExpanded,
   });
 
@@ -445,7 +419,7 @@ class _FaqTile extends StatelessWidget {
       tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
-      iconColor: color,
+      iconColor: AppColors.primary,
       collapsedIconColor: AppColors.textMuted,
       expansionAnimationStyle: const AnimationStyle(
         duration: AppMotion.normal,
@@ -453,7 +427,7 @@ class _FaqTile extends StatelessWidget {
       ),
       title: Text(
         faq.question,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
@@ -462,7 +436,7 @@ class _FaqTile extends StatelessWidget {
       children: [
         Text(
           faq.answer,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             color: AppColors.textSecondary,
             height: 1.5,
@@ -486,7 +460,7 @@ class _StillNeedHelp extends StatelessWidget {
         children: [
           Row(
             children: [
-              const IconBadge(
+              IconBadge(
                 icon: Icons.bug_report_outlined,
                 color: AppColors.primary,
               ),
@@ -502,7 +476,7 @@ class _StillNeedHelp extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    const Text(
+                    Text(
                       'Create a problem report, fill in what went wrong and '
                       'send it using any app on your device.',
                       style: TextStyle(

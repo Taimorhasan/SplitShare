@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../app/routes/app_routes.dart';
+import '../controllers/balances.dart';
 import '../controllers/expense_controller.dart';
 import '../controllers/friend_controller.dart';
 import '../controllers/group_controller.dart';
@@ -9,10 +10,10 @@ import '../controllers/profile_controller.dart';
 import '../controllers/shell_controller.dart';
 import '../controllers/trip_controller.dart';
 import '../core/ui.dart';
-import 'widgets/expense_tile.dart';
+import 'trips_screen.dart' show GroupsHub;
+import 'widgets/history.dart';
 
-/// Home tab: greeting, balance overview, quick actions, monthly insight,
-/// people balances and recent activity.
+/// Home tab: your name, the balance card, then who owes whom.
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
@@ -27,7 +28,7 @@ class DashboardScreen extends StatelessWidget {
         child: Obx(() {
           final loading = ec.isLoading.value;
           final error = ec.hasError.value;
-          final isNew = ec.recentActivity.isEmpty && ec.settleUpData.isEmpty;
+          final isNew = ec.recentActivity.isEmpty && ec.settleUpData.isEmpty && TripController.to.trips.isEmpty;
 
           final String stateKey;
           final Widget body;
@@ -86,13 +87,12 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final profile = ProfileController.to;
-    final theme = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.page,
-        AppSpacing.md,
+        AppSpacing.lg,
         AppSpacing.page,
-        AppSpacing.sm,
+        0,
       ),
       child: Row(
         children: [
@@ -100,20 +100,27 @@ class _Header extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Obx(
-                  () => Text(
-                    '${_greeting()}, ${Fmt.firstName(profile.name.value)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.headlineSmall,
+                Text(
+                  _greeting(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  'Here\'s where you stand today',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.bodyMedium,
+                Obx(
+                  () => Text(
+                    Fmt.firstName(profile.name.value),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -133,17 +140,10 @@ class _Header extends StatelessWidget {
             child: Pressable(
               onTap: () => AppNav.toTab(AppTab.profile),
               child: Obx(
-                () => Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: AppShadows.soft,
-                  ),
-                  child: AppAvatar(
-                    name: profile.name.value,
-                    imageUrl: profile.avatarUrl.value,
-                    radius: 22,
-                    ring: true,
-                  ),
+                () => AppAvatar(
+                  name: profile.name.value,
+                  imageUrl: profile.avatarUrl.value,
+                  radius: 20,
                 ),
               ),
             ),
@@ -166,52 +166,20 @@ class _DashboardContent extends StatelessWidget {
     return const Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FadeSlideIn(index: 1, child: _HeroBalanceCard()),
-        FadeSlideIn(index: 2, child: _QuickActions()),
-        FadeSlideIn(index: 3, child: _TripSplitBanner()),
-        FadeSlideIn(index: 3, child: _MonthInsight()),
-        FadeSlideIn(index: 4, child: _BalancesSection()),
-        FadeSlideIn(index: 5, child: _RecentActivitySection()),
+        FadeSlideIn(index: 1, child: _NetBalance()),
+        FadeSlideIn(index: 2, child: _BalancesSection()),
+        FadeSlideIn(index: 3, child: _QuickActions()),
+        FadeSlideIn(index: 4, child: _MonthInsight()),
+        FadeSlideIn(index: 5, child: _HistorySection()),
       ],
     );
   }
 }
 
-/// Animated money value: counts smoothly to the new amount on change.
-class _AnimatedMoney extends StatelessWidget {
-  final double value;
-  final String currency;
-  final TextStyle? style;
-  final bool signed;
-
-  const _AnimatedMoney({
-    required this.value,
-    required this.currency,
-    this.style,
-    this.signed = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: value),
-      duration: const Duration(milliseconds: 700),
-      curve: AppMotion.curve,
-      builder: (_, v, _) => FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.centerLeft,
-        child: Text(
-          Fmt.money(v, currencyCode: currency, signed: signed),
-          maxLines: 1,
-          style: style,
-        ),
-      ),
-    );
-  }
-}
-
-class _HeroBalanceCard extends StatelessWidget {
-  const _HeroBalanceCard();
+/// The page's one total: net balance in the user's currency, on the
+/// pistachio card with the owed / owe split bar.
+class _NetBalance extends StatelessWidget {
+  const _NetBalance();
 
   @override
   Widget build(BuildContext context) {
@@ -219,14 +187,18 @@ class _HeroBalanceCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.page,
-        AppSpacing.md,
+        AppSpacing.xl,
         AppSpacing.page,
         0,
       ),
       child: Obx(() {
         final cur = ProfileController.to.currencyCode.value;
-        final owed = Map<String, double>.from(ec.owedToMeByCurrency);
-        final owe = Map<String, double>.from(ec.iOweByCurrency);
+        ec.balances.length;
+        TripController.to.trips.length;
+        // Friends & groups, cancelled per person.
+        final totals = Balances.totals();
+        final owed = totals.owed;
+        final owe = totals.owe;
         final owedMain = owed[cur] ?? 0;
         final oweMain = owe[cur] ?? 0;
         final net = owedMain - oweMain;
@@ -237,256 +209,28 @@ class _HeroBalanceCard extends StatelessWidget {
           final v = (owed[c] ?? 0) - (owe[c] ?? 0);
           if (v.abs() >= 0.005) otherNets[c] = v;
         }
-        final otherOwed = Map<String, double>.from(owed)..remove(cur);
-        final otherOwe = Map<String, double>.from(owe)..remove(cur);
 
-        final caption = net > 0.005
-            ? 'Overall, you are owed'
-            : net < -0.005
-                ? 'Overall, you owe'
-                : 'You\'re all settled up';
+        final caption = otherNets.isEmpty
+            ? null
+            : 'Plus ${Fmt.multi(otherNets, preferred: cur, absolute: false)} in other currencies';
+        final youOwe = net < -0.005;
+        final settled = net.abs() < 0.005;
 
-        return Container(
-          decoration: BoxDecoration(
-            gradient: AppColors.heroGradient,
-            borderRadius: BorderRadius.circular(AppRadius.xl),
-            boxShadow: AppShadows.glow(AppColors.primary),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.xl),
-            child: Stack(
-              children: [
-                Positioned(
-                  top: -60,
-                  right: -40,
-                  child: _Circle(size: 180, opacity: 0.10),
-                ),
-                Positioned(
-                  bottom: -70,
-                  left: -30,
-                  child: _Circle(size: 160, opacity: 0.07),
-                ),
-                Positioned(
-                  top: 40,
-                  right: 60,
-                  child: _Circle(size: 36, opacity: 0.08),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(AppSpacing.xl),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              'Total balance',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          _HeroPill(label: cur),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      _AnimatedMoney(
-                        value: net,
-                        currency: cur,
-                        signed: true,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 36,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -1,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        caption,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      if (otherNets.isNotEmpty) ...[
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          'Plus ${Fmt.multi(otherNets, preferred: cur, absolute: false)} in other currencies',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: AppSpacing.lg),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _HeroStat(
-                              icon: Icons.south_west_rounded,
-                              label: 'You are owed',
-                              value: owedMain,
-                              currency: cur,
-                              others: otherOwed,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: _HeroStat(
-                              icon: Icons.north_east_rounded,
-                              label: 'You owe',
-                              value: oweMain,
-                              currency: cur,
-                              others: otherOwe,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      AppButton.secondary(
-                        label: 'Settle up',
-                        icon: Icons.handshake_rounded,
-                        height: 48,
-                        onPressed: () => Get.toNamed(AppRoutes.settleUp),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+        return KhataTotal(
+          label: settled
+              ? "You're all settled up"
+              : youOwe
+              ? 'Overall, you owe'
+              : 'Overall, you get back',
+          amount: Fmt.money(net.abs(), currencyCode: cur),
+          caption: caption,
+          color: youOwe ? AppColors.negative : null,
+          owed: owedMain,
+          owe: oweMain,
+          owedLabel: 'Owed to you ${Fmt.money(owedMain, currencyCode: cur)}',
+          oweLabel: 'You owe ${Fmt.money(oweMain, currencyCode: cur)}',
         );
       }),
-    );
-  }
-}
-
-class _Circle extends StatelessWidget {
-  final double size;
-  final double opacity;
-  const _Circle({required this.size, required this.opacity});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white.withValues(alpha: opacity),
-      ),
-    );
-  }
-}
-
-class _HeroPill extends StatelessWidget {
-  final String label;
-  const _HeroPill({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.4,
-        ),
-      ),
-    );
-  }
-}
-
-class _HeroStat extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final double value;
-  final String currency;
-  final Map<String, double> others;
-
-  const _HeroStat({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.currency,
-    required this.others,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final hasOthers = others.values.any((v) => v.abs() >= 0.005);
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 12, color: Colors.white),
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          _AnimatedMoney(
-            value: value,
-            currency: currency,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          if (hasOthers)
-            Text(
-              '+ ${Fmt.multi(others, preferred: currency)}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-        ],
-      ),
     );
   }
 }
@@ -502,9 +246,9 @@ class _QuickActions extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.page,
+        AppSpacing.page - AppSpacing.sm,
         AppSpacing.xl,
-        AppSpacing.page,
+        AppSpacing.page - AppSpacing.sm,
         0,
       ),
       child: Row(
@@ -514,31 +258,27 @@ class _QuickActions extends StatelessWidget {
             child: _QuickAction(
               icon: Icons.add_rounded,
               label: 'Add expense',
-              color: AppColors.primary,
               onTap: () => AppNav.addExpense(),
             ),
           ),
           Expanded(
             child: _QuickAction(
-              icon: Icons.handshake_rounded,
+              icon: Icons.handshake_outlined,
               label: 'Settle up',
-              color: AppColors.positive,
               onTap: () => Get.toNamed(AppRoutes.settleUp),
             ),
           ),
           Expanded(
             child: _QuickAction(
-              icon: Icons.group_add_rounded,
+              icon: Icons.group_add_outlined,
               label: 'New group',
-              color: AppColors.secondary,
-              onTap: () => Get.toNamed(AppRoutes.createGroup),
+              onTap: GroupsHub.startNewGroup,
             ),
           ),
           Expanded(
             child: _QuickAction(
-              icon: Icons.person_add_alt_1_rounded,
+              icon: Icons.person_add_alt_outlined,
               label: 'Add friend',
-              color: AppColors.accent,
               onTap: () => Get.toNamed(AppRoutes.addFriends),
             ),
           ),
@@ -548,16 +288,15 @@ class _QuickActions extends StatelessWidget {
   }
 }
 
+/// A plain icon + label button: no tile, no tint.
 class _QuickAction extends StatelessWidget {
   final IconData icon;
   final String label;
-  final Color color;
   final VoidCallback onTap;
 
   const _QuickAction({
     required this.icon,
     required this.label,
-    required this.color,
     required this.onTap,
   });
 
@@ -566,42 +305,40 @@ class _QuickAction extends StatelessWidget {
     return Semantics(
       button: true,
       label: label,
-      child: Pressable(
-        onTap: onTap,
-        child: Column(
-          children: [
-            Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                shape: BoxShape.circle,
-                boxShadow: AppShadows.soft,
-              ),
-              alignment: Alignment.center,
-              child: Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
+      excludeSemantics: true,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
+            child: Column(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: AppColors.primary, size: 24),
                 ),
-                child: Icon(icon, color: color, size: 22),
-              ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -637,102 +374,78 @@ class _MonthInsight extends StatelessWidget {
         ..sort((a, b) => b.value.compareTo(a.value));
       final catTotal = cats.fold<double>(0, (a, e) => a + e.value);
 
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.page,
-          AppSpacing.xxl,
-          AppSpacing.page,
-          0,
-        ),
-        child: AppCard(
-          padding: const EdgeInsets.all(AppSpacing.lg + 2),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SectionHeader(title: _months[DateTime.now().month - 1]),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
+            child: AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const IconBadge(
-                    icon: Icons.insights_rounded,
-                    color: AppColors.primary,
-                    size: 36,
-                    iconSize: 19,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Your share of expenses',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Flexible(
+                        child: Text(
+                          main != null
+                              ? Fmt.money(main, currencyCode: cur)
+                              : Fmt.multi(byCurrency, preferred: cur),
+                          textAlign: TextAlign.end,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: AppSpacing.md),
-                  const Expanded(
-                    child: Text(
-                      'This month',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                  if (main != null && others.isNotEmpty)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        '+ ${Fmt.multi(others, preferred: cur)}',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
-                  ),
-                  StatusPill(
-                    label: _months[DateTime.now().month - 1].toUpperCase(),
-                    color: AppColors.primary,
-                  ),
+                  if (cats.isNotEmpty && catTotal > 0) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    _CategoryBar(entries: cats, total: catTotal),
+                    const SizedBox(height: AppSpacing.md),
+                    Wrap(
+                      spacing: AppSpacing.lg,
+                      runSpacing: AppSpacing.sm,
+                      children: [
+                        for (final e in cats.take(6))
+                          _LegendItem(
+                            style: ExpenseCategories.of(e.key),
+                            label: e.key,
+                            percent: e.value / catTotal * 100,
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
-              const SizedBox(height: AppSpacing.lg),
-              const Text(
-                'Your share of expenses',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 2),
-              if (main != null)
-                _AnimatedMoney(
-                  value: main,
-                  currency: cur,
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.6,
-                    color: AppColors.textPrimary,
-                  ),
-                )
-              else
-                Text(
-                  Fmt.multi(byCurrency, preferred: cur),
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              if (main != null && others.isNotEmpty)
-                Text(
-                  '+ ${Fmt.multi(others, preferred: cur)}',
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              if (cats.isNotEmpty && catTotal > 0) ...[
-                const SizedBox(height: AppSpacing.lg),
-                _CategoryBar(entries: cats, total: catTotal),
-                const SizedBox(height: AppSpacing.md),
-                Wrap(
-                  spacing: AppSpacing.lg,
-                  runSpacing: AppSpacing.sm,
-                  children: [
-                    for (final e in cats.take(6))
-                      _LegendItem(
-                        style: ExpenseCategories.of(e.key),
-                        label: e.key,
-                        percent: e.value / catTotal * 100,
-                      ),
-                  ],
-                ),
-              ],
-            ],
+            ),
           ),
-        ),
+        ],
       );
     });
   }
@@ -746,20 +459,10 @@ class _CategoryBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 900),
-      curve: AppMotion.curve,
-      builder: (_, t, child) => ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          widthFactor: t,
-          child: child,
-        ),
-      ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.sm / 2),
       child: SizedBox(
-        height: 12,
+        height: 8,
         child: Row(
           children: [
             for (var i = 0; i < entries.length; i++) ...[
@@ -795,23 +498,25 @@ class _LegendItem extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 9,
-          height: 9,
-          decoration: BoxDecoration(color: style.color, shape: BoxShape.circle),
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: style.color,
+            borderRadius: BorderRadius.circular(2),
+          ),
         ),
         const SizedBox(width: 6),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12.5,
-            fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(width: 4),
         Text(
           '${percent < 1 ? '<1' : percent.round()}%',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12.5,
             color: AppColors.textSecondary,
           ),
@@ -822,7 +527,7 @@ class _LegendItem extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Balances with people
+// Balances with people — one ruled udhaar list
 // ---------------------------------------------------------------------------
 
 class _BalancesSection extends StatelessWidget {
@@ -836,81 +541,53 @@ class _BalancesSection extends StatelessWidget {
     final ec = ExpenseController.to;
     return Obx(() {
       final cur = ProfileController.to.currencyCode.value;
-      final people = ec.settleUpData.values
-          .map((p) => {
-                ...p,
-                'byCurrency': Map<String, double>.from(
-                  (p['byCurrency'] as Map?) ?? const {},
-                ),
-              })
+      ec.settleUpData.length;
+      TripController.to.trips.length;
+      // Everyone, including group people who aren't on SplitShare.
+      final people = Balances.everyone()
+          .entries
+          .map((e) {
+            final info = Balances.personInfo(e.key);
+            return <String, dynamic>{
+              'uid': e.key,
+              'name': info.name,
+              'avatarUrl': info.avatarUrl,
+              'byCurrency': e.value,
+            };
+          })
           .toList()
         ..sort((a, b) => _weight(b['byCurrency'] as Map<String, double>)
             .compareTo(_weight(a['byCurrency'] as Map<String, double>)));
-      final shown = people.take(5).toList();
+      final shown = people.take(10).toList();
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SectionHeader(
-            title: 'Balances',
-            actionLabel: 'See all',
+            title: 'Friends',
+            actionLabel: 'All friends',
             onAction: () => AppNav.toTab(AppTab.friends),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
-            child: shown.isEmpty
-                ? const AppCard(
-                    child: Row(
-                      children: [
-                        IconBadge(
-                          icon: Icons.verified_rounded,
-                          color: AppColors.positive,
-                        ),
-                        SizedBox(width: AppSpacing.md + 2),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'You\'re all settled up',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'No one owes anyone right now.',
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : AppCard(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-                    child: Column(
-                      children: [
-                        for (var i = 0; i < shown.length; i++) ...[
-                          if (i > 0)
-                            const Divider(
-                              height: 1,
-                              indent: 70,
-                              endIndent: AppSpacing.lg,
-                              color: AppColors.border,
-                            ),
-                          _PersonRow(person: shown[i], currency: cur),
-                        ],
-                      ],
-                    ),
-                  ),
-          ),
+          if (shown.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
+              child: Text(
+                "You're all settled up. No one owes anyone right now.",
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              ),
+            )
+          else
+            SizedBox(
+              height: 132,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
+                itemCount: shown.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 10),
+                itemBuilder: (_, i) =>
+                    _PersonRow(person: shown[i], currency: cur),
+              ),
+            ),
         ],
       );
     });
@@ -928,41 +605,97 @@ class _PersonRow extends StatelessWidget {
     final uid = person['uid'].toString();
     final name = (person['name'] ?? 'Someone').toString();
     final avatar = (person['avatarUrl'] ?? '').toString();
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        onTap: () => AppNav.openFriend(
-          uid,
-          data: {'name': name, 'avatarUrl': avatar},
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.md,
-          ),
-          child: Row(
+    final byCurrency = person['byCurrency'] as Map<String, double>;
+
+    final nonZero =
+        byCurrency.entries.where((e) => e.value.abs() >= 0.005).toList();
+    final primary = nonZero.isEmpty
+        ? 0.0
+        : (byCurrency[currency] ?? nonZero.first.value);
+    final dir = BalanceDirectionX.fromNet(primary);
+    final mixed = nonZero.any((e) => e.value.sign != primary.sign);
+
+    final String words;
+    final String amount;
+    final Color wordsColor;
+    final Color amountColor;
+    if (nonZero.isEmpty) {
+      words = 'settled';
+      amount = Fmt.money(0, currencyCode: currency);
+      wordsColor = AppColors.textMuted;
+      amountColor = AppColors.textMuted;
+    } else if (mixed) {
+      words = 'mixed';
+      amount = Fmt.multi(byCurrency, preferred: currency, absolute: false);
+      wordsColor = AppColors.textSecondary;
+      amountColor = AppColors.textPrimary;
+    } else if (dir == BalanceDirection.youOwe) {
+      words = 'you owe';
+      amount = '- ${Fmt.multi(byCurrency, preferred: currency)}';
+      wordsColor = AppColors.negative;
+      amountColor = AppColors.negative;
+    } else {
+      words = 'owes you';
+      amount = Fmt.multi(byCurrency, preferred: currency);
+      wordsColor = AppColors.textSecondary;
+      amountColor = AppColors.textPrimary;
+    }
+
+    final shortAmount = nonZero.isEmpty
+        ? amount
+        : mixed
+        ? amount
+        : dir == BalanceDirection.youOwe
+        ? '− ${Fmt.multi(byCurrency, preferred: currency)}'
+        : '+ ${Fmt.multi(byCurrency, preferred: currency)}';
+    final shownColor = nonZero.isEmpty || mixed
+        ? amountColor
+        : dir == BalanceDirection.youOwe
+        ? AppColors.negative
+        : AppColors.positive;
+
+    return Semantics(
+      button: true,
+      label: '$name, $words, $amount',
+      excludeSemantics: true,
+      child: AppCard(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        radius: AppRadius.lg,
+        onTap: () => uid.startsWith('name:')
+            ? Get.toNamed(AppRoutes.settleUp)
+            : AppNav.openFriend(uid, data: {'name': name, 'avatarUrl': avatar}),
+        child: SizedBox(
+          width: 104,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppAvatar(name: name, imageUrl: avatar, radius: 20),
-              const SizedBox(width: AppSpacing.md + 2),
-              Expanded(
-                child: Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
+              AppAvatar(name: name, imageUrl: avatar, radius: 18),
+              const Spacer(),
+              Text(
+                Fmt.firstName(name),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Flexible(
-                child: BalanceLabel(
-                  byCurrency: person['byCurrency'] as Map<String, double>,
-                  preferredCurrency: currency,
+              const SizedBox(height: 2),
+              Text(
+                shortAmount,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: shownColor,
                 ),
+              ),
+              Text(
+                words,
+                maxLines: 1,
+                style: TextStyle(fontSize: 12, color: wordsColor),
               ),
             ],
           ),
@@ -973,40 +706,32 @@ class _PersonRow extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Recent activity
+// History
 // ---------------------------------------------------------------------------
 
-class _RecentActivitySection extends StatelessWidget {
-  const _RecentActivitySection();
+/// Latest transactions: expenses, payments and group payments / pay-backs.
+class _HistorySection extends StatelessWidget {
+  const _HistorySection();
 
   @override
   Widget build(BuildContext context) {
-    final ec = ExpenseController.to;
     return Obx(() {
-      final items = ec.recentActivity.take(6).toList();
-      if (items.isEmpty) return const SizedBox.shrink();
+      ExpenseController.to.recentActivity.length;
+      TripController.to.trips.length;
+      final entries = buildHistory();
+      if (entries.isEmpty) return const SizedBox.shrink();
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SectionHeader(
-            title: 'Recent activity',
+            title: 'History',
             actionLabel: 'See all',
             onAction: () => Get.toNamed(AppRoutes.activity),
           ),
-          for (var i = 0; i < items.length; i++)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.page,
-                0,
-                AppSpacing.page,
-                AppSpacing.md - 2,
-              ),
-              child: FadeSlideIn(
-                key: ValueKey(items[i]['id']),
-                index: i,
-                child: ExpenseTile(expense: items[i]),
-              ),
-            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
+            child: HistoryList(entries, limit: 15),
+          ),
         ],
       );
     });
@@ -1030,84 +755,24 @@ class _NewUserContent extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.page,
-              AppSpacing.md,
+              AppSpacing.xl,
               AppSpacing.page,
               0,
             ),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: AppColors.heroGradient,
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-                boxShadow: AppShadows.glow(AppColors.primary),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-                child: Stack(
-                  children: [
-                    const Positioned(
-                      top: -50,
-                      right: -40,
-                      child: _Circle(size: 170, opacity: 0.10),
-                    ),
-                    const Positioned(
-                      bottom: -60,
-                      left: -30,
-                      child: _Circle(size: 140, opacity: 0.07),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xl),
-                      child: Row(
-                        children: [
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Welcome to SplitShare',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 21,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: -0.4,
-                                  ),
-                                ),
-                                SizedBox(height: AppSpacing.sm),
-                                Text(
-                                  'Split bills with friends and groups, and always know who owes what.',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 13.5,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.16),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.receipt_long_rounded,
-                              color: Colors.white,
-                              size: 30,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+            child: Obx(
+              () => KhataTotal(
+                label: 'Net balance',
+                amount: Fmt.money(
+                  0,
+                  currencyCode: ProfileController.to.currencyCode.value,
                 ),
+                caption: 'A clean page. Split bills with friends and groups, '
+                    'and always know who owes what.',
               ),
             ),
           ),
         ),
         const FadeSlideIn(index: 2, child: _QuickActions()),
-        const FadeSlideIn(index: 3, child: _TripSplitBanner()),
         const FadeSlideIn(index: 3, child: _GetStartedCard()),
       ],
     );
@@ -1119,84 +784,92 @@ class _GetStartedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.page,
-        AppSpacing.xxl,
-        AppSpacing.page,
-        0,
-      ),
-      child: Obx(() {
-        final hasFriend = FriendController.to.friends.isNotEmpty;
-        final hasGroup = GroupController.to.groups.isNotEmpty;
-        final hasExpense = ExpenseController.to.recentActivity.isNotEmpty;
-        final done = [hasFriend, hasGroup, hasExpense].where((d) => d).length;
+    return Obx(() {
+      final hasFriend = FriendController.to.friends.isNotEmpty;
+      final hasGroup = GroupController.to.groups.isNotEmpty;
+      final hasExpense = ExpenseController.to.recentActivity.isNotEmpty;
+      final done = [hasFriend, hasGroup, hasExpense].where((d) => d).length;
+      final divider = Divider(
+        height: 1,
+        thickness: 1,
+        indent: AppSpacing.lg,
+        endIndent: AppSpacing.lg,
+        color: AppColors.border,
+      );
 
-        return AppCard(
-          padding: const EdgeInsets.all(AppSpacing.lg + 2),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Get started',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  StatusPill(
-                    label: '$done OF 3 DONE',
-                    color: done == 3 ? AppColors.positive : AppColors.primary,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0, end: done / 3),
-                  duration: AppMotion.slow,
-                  curve: AppMotion.curve,
-                  builder: (_, v, _) => LinearProgressIndicator(
-                    value: v,
-                    minHeight: 6,
-                    backgroundColor: AppColors.surfaceMuted,
-                    color: AppColors.primary,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.page,
+              AppSpacing.xxl,
+              AppSpacing.page,
+              AppSpacing.md,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Get started',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 17,
+                        ),
                   ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              _ChecklistItem(
-                icon: Icons.person_add_alt_1_rounded,
-                title: 'Add a friend',
-                subtitle: 'Find people by name, email or QR code',
-                done: hasFriend,
-                onTap: () => Get.toNamed(AppRoutes.addFriends),
-              ),
-              _ChecklistItem(
-                icon: Icons.group_add_rounded,
-                title: 'Create a group',
-                subtitle: 'For trips, housemates or a night out',
-                done: hasGroup,
-                onTap: () => Get.toNamed(AppRoutes.createGroup),
-              ),
-              _ChecklistItem(
-                icon: Icons.receipt_long_rounded,
-                title: 'Add your first expense',
-                subtitle: 'Split a bill and we\'ll do the maths',
-                done: hasExpense,
-                onTap: () => AppNav.addExpense(),
-              ),
-            ],
+                Text(
+                  '$done of 3 done',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: done == 3
+                        ? AppColors.positive
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
           ),
-        );
-      }),
-    );
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
+            child: AppCard(
+              padding: EdgeInsets.zero,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                child: Column(
+                  children: [
+                    _ChecklistItem(
+                      icon: Icons.person_add_alt_outlined,
+                      title: 'Add a friend',
+                      subtitle: 'Find people by name, email or QR code',
+                      done: hasFriend,
+                      onTap: () => Get.toNamed(AppRoutes.addFriends),
+                    ),
+                    divider,
+                    _ChecklistItem(
+                      icon: Icons.group_add_outlined,
+                      title: 'Create a group',
+                      subtitle: 'For travel, housemates or a night out',
+                      done: hasGroup,
+                      onTap: GroupsHub.startNewGroup,
+                    ),
+                    divider,
+                    _ChecklistItem(
+                      icon: Icons.receipt_long_outlined,
+                      title: 'Add your first expense',
+                      subtitle: 'Split a bill and we\'ll do the maths',
+                      done: hasExpense,
+                      onTap: () => AppNav.addExpense(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    });
   }
 }
 
@@ -1218,30 +891,23 @@ class _ChecklistItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
+      type: MaterialType.transparency,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.md),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md + 2,
+          ),
           child: Row(
             children: [
-              AnimatedContainer(
+              AnimatedSwitcher(
                 duration: AppMotion.normal,
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: done ? AppColors.positive : AppColors.primaryLight,
-                  shape: BoxShape.circle,
-                ),
-                child: AnimatedSwitcher(
-                  duration: AppMotion.normal,
-                  child: Icon(
-                    done ? Icons.check_rounded : icon,
-                    key: ValueKey(done),
-                    size: 20,
-                    color: done ? Colors.white : AppColors.primary,
-                  ),
+                child: Icon(
+                  done ? Icons.check_rounded : icon,
+                  key: ValueKey(done),
+                  size: 22,
+                  color: done ? AppColors.textMuted : AppColors.primary,
                 ),
               ),
               const SizedBox(width: AppSpacing.md + 2),
@@ -1267,7 +933,7 @@ class _ChecklistItem extends StatelessWidget {
                       subtitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12.5,
                         color: AppColors.textSecondary,
                       ),
@@ -1276,10 +942,13 @@ class _ChecklistItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
-              Icon(
-                done ? Icons.check_circle_rounded : Icons.chevron_right_rounded,
-                color: done ? AppColors.positive : AppColors.textMuted,
-              ),
+              if (done)
+                Text(
+                  'done',
+                  style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+                )
+              else
+                Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
             ],
           ),
         ),
@@ -1297,112 +966,28 @@ class _DashboardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(
         AppSpacing.page,
-        AppSpacing.md,
+        AppSpacing.xl,
         AppSpacing.page,
         0,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Skeleton(height: 250, radius: AppRadius.xl),
-          const SizedBox(height: AppSpacing.xl),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              for (var i = 0; i < 4; i++)
-                const Column(
-                  children: [
-                    Skeleton.circle(size: 58),
-                    SizedBox(height: AppSpacing.sm),
-                    Skeleton(width: 54, height: 10),
-                  ],
-                ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xxl),
-          const Skeleton(width: 120, height: 16),
-          const SizedBox(height: AppSpacing.md),
-          const SkeletonList(
+          Skeleton(width: 90, height: 12),
+          SizedBox(height: AppSpacing.sm),
+          Skeleton(width: 200, height: 40),
+          SizedBox(height: AppSpacing.md),
+          Skeleton(width: 240, height: 12),
+          SizedBox(height: AppSpacing.xxl),
+          SkeletonList(
             count: 4,
             shrinkWrap: true,
             padding: EdgeInsets.zero,
           ),
         ],
-      ),
-    );
-  }
-}
-
-
-/// Entry to "Lain Dain": log who paid on a trip / day out and get the
-/// fewest "X pays Y" transfers.
-class _TripSplitBanner extends StatelessWidget {
-  const _TripSplitBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-          AppSpacing.page, AppSpacing.lg, AppSpacing.page, 0),
-      child: AppCard(
-        onTap: () => Get.toNamed(AppRoutes.trips),
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.accent, AppColors.primary],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Icon(Icons.luggage_rounded, color: Colors.white, size: 26),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Obx(() {
-                final trips = TripController.to.trips;
-                final open = trips.where((t) => t.plan.isNotEmpty).length;
-                final subtitle = trips.isEmpty
-                    ? 'Give & take — log who paid, see who owes whom'
-                    : open == 0
-                        ? '${trips.length} ${trips.length == 1 ? 'trip' : 'trips'} · all settled'
-                        : '$open ${open == 1 ? 'trip has' : 'trips have'} people to pay back';
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Lain Dain',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                );
-              }),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
-          ],
-        ),
       ),
     );
   }

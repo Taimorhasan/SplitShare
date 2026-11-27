@@ -227,11 +227,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       child = ListView.builder(
         key: const ValueKey('list'),
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.page,
-          AppSpacing.xs,
-          AppSpacing.page,
-          AppSpacing.xxxl,
+        padding: const EdgeInsets.only(
+          top: AppSpacing.xs,
+          bottom: AppSpacing.xxxl,
         ),
         itemCount: rows.length,
         itemBuilder: (context, i) {
@@ -239,21 +237,31 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           if (row is String) return _SectionLabel(label: row, first: i == 0);
           final n = row as Map<String, dynamic>;
           final id = n['id'].toString();
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.md - 2),
-            child: FadeSlideIn(
-              key: ValueKey('fade-$id'),
-              index: i.clamp(0, 8),
-              child: Dismissible(
-                key: ValueKey(id),
-                direction: DismissDirection.endToStart,
-                background: const _DeleteBackground(),
-                onDismissed: (_) => _delete(n),
-                child: _NotificationCard(
-                  notification: n,
-                  onTap: () => _open(n),
+          final nextIsRow = i + 1 < rows.length && rows[i + 1] is! String;
+          return FadeSlideIn(
+            key: ValueKey('fade-$id'),
+            index: i.clamp(0, 8),
+            child: Column(
+              children: [
+                Dismissible(
+                  key: ValueKey(id),
+                  direction: DismissDirection.endToStart,
+                  background: const _DeleteBackground(),
+                  onDismissed: (_) => _delete(n),
+                  child: _NotificationRow(
+                    notification: n,
+                    onTap: () => _open(n),
+                  ),
                 ),
-              ),
+                if (nextIsRow)
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    indent: AppSpacing.page + 40 + AppSpacing.md,
+                    endIndent: AppSpacing.page,
+                    color: AppColors.border,
+                  ),
+              ],
             ),
           );
         },
@@ -263,106 +271,100 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 }
 
-class _NotificationCard extends StatelessWidget {
+class _NotificationRow extends StatelessWidget {
   final Map<String, dynamic> notification;
   final VoidCallback onTap;
 
-  const _NotificationCard({required this.notification, required this.onTap});
+  const _NotificationRow({required this.notification, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final n = notification;
     final unread = n['isRead'] != true;
-    final rawColor = n['iconColor'];
-    final color = rawColor is int ? Color(rawColor) : AppColors.primary;
     final title = (n['title'] ?? 'Notification').toString();
     final message = (n['message'] ?? '').toString();
 
-    return AppCard(
-      onTap: onTap,
-      color: unread ? AppColors.primaryLight : AppColors.surface,
-      border: unread
-          ? Border.all(color: AppColors.primary.withValues(alpha: 0.14))
-          : null,
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          IconBadge(
-            icon: NotificationController.iconFromName(n['iconName']?.toString()),
-            color: color,
-            size: 44,
-            iconSize: 21,
+    return Material(
+      color: AppColors.background,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.page,
+            vertical: AppSpacing.md + 2,
           ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              IconBadge(
+                icon: NotificationController.iconFromName(
+                  n['iconName']?.toString(),
+                ),
+                color: unread ? AppColors.primary : AppColors.textSecondary,
+                size: 40,
+                iconSize: 20,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        maxLines: 2,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight:
+                                  unread ? FontWeight.w700 : FontWeight.w500,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Text(
+                          Fmt.relative(n['createdAt']),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (message.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        message,
+                        maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight:
-                              unread ? FontWeight.w700 : FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          fontSize: 13,
+                          height: 1.35,
+                          color: AppColors.textSecondary,
                         ),
                       ),
-                    ),
-                    if (unread)
-                      Container(
-                        width: 9,
-                        height: 9,
-                        margin: const EdgeInsets.only(left: 8, top: 5),
-                        decoration: const BoxDecoration(
+                    ],
+                    if (unread) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'New',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                           color: AppColors.primary,
-                          shape: BoxShape.circle,
                         ),
                       ),
+                    ],
                   ],
                 ),
-                if (message.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    message,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      height: 1.35,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.schedule_rounded,
-                      size: 13,
-                      color: AppColors.textMuted,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      Fmt.relative(n['createdAt']),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -373,26 +375,24 @@ class _DeleteBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fg = AppColors.onPrimary;
     return Container(
       alignment: Alignment.centerRight,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
-      decoration: BoxDecoration(
-        gradient: AppColors.negativeGradient,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      child: const Row(
+      color: AppColors.negative,
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             'Delete',
             style: TextStyle(
-              color: Colors.white,
+              color: fg,
               fontWeight: FontWeight.w700,
               fontSize: 14,
             ),
           ),
-          SizedBox(width: AppSpacing.sm),
-          Icon(Icons.delete_outline_rounded, color: Colors.white),
+          const SizedBox(width: AppSpacing.sm),
+          Icon(Icons.delete_outline_rounded, color: fg),
         ],
       ),
     );
@@ -408,30 +408,25 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-        top: first ? AppSpacing.sm : AppSpacing.lg,
-        bottom: AppSpacing.sm + 2,
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.page,
+        first ? AppSpacing.sm : AppSpacing.xxl,
+        AppSpacing.page,
+        0,
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceMuted,
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-            ),
-            child: Text(
-              label.toUpperCase(),
-              style: const TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6,
-                color: AppColors.textSecondary,
-              ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(width: AppSpacing.sm),
-          const Expanded(child: Divider(color: AppColors.border, height: 1)),
+          const SizedBox(height: AppSpacing.sm),
+          Divider(height: 1, thickness: 1, color: AppColors.border),
         ],
       ),
     );

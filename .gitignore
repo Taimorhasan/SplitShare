@@ -65,3 +65,17 @@ macos/firebase_app_id_file.json
 *.jks
 android/key.properties
 **/service-account*.json
+
+# Claude Code: personal settings and locally installed third-party skills
+# (impeccable, ponytail, ui-ux-pro-max, taste-skill, no-ai-design-slop).
+# They are tools, not part of the app; reinstall them locally if needed.
+.claude/settings.local.json
+.claude/skills/
+
+# Impeccable scratch: device screenshots (contain personal account details),
+# throwaway mockups and question pages. DESIGN.md, PRODUCT.md and
+# .impeccable/design.json are kept.
+.impeccable/review/
+.impeccable/mocks/
+.impeccable/questions/
+.impeccable/config.local.json

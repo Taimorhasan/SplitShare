@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -225,7 +224,10 @@ class _DetailBody extends StatelessWidget {
       _metaRow(e, creator == me ? 'you' : creatorName),
       if (groupId != null && groupId.isNotEmpty) ...[
         const SizedBox(height: AppSpacing.md),
-        Center(child: _GroupChip(groupId: groupId)),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _GroupChip(groupId: groupId),
+        ),
       ],
       if (!isPayment) ...[
         const SizedBox(height: AppSpacing.xl),
@@ -243,7 +245,7 @@ class _DetailBody extends StatelessWidget {
             subtitle: payer == me ? 'You paid the full bill' : 'Paid the full bill',
             trailing: Text(
               Fmt.money(amount, currencyCode: currency),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15.5,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
@@ -266,12 +268,12 @@ class _DetailBody extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.sticky_note_2_outlined, color: AppColors.warning, size: 20),
+              Icon(Icons.sticky_note_2_outlined, color: AppColors.warning, size: 20),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   notes,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14.5,
                     height: 1.45,
                     color: AppColors.textPrimary,
@@ -282,7 +284,7 @@ class _DetailBody extends StatelessWidget {
           ),
         ),
       ],
-      if (receiptUrl.startsWith('http')) ...[
+      if (AppImage.canShow(receiptUrl)) ...[
         const SectionHeader(
           title: 'Receipt',
           padding: EdgeInsets.only(top: AppSpacing.xxl, bottom: AppSpacing.md),
@@ -294,13 +296,13 @@ class _DetailBody extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.lock_outline_rounded, size: 15, color: AppColors.textMuted),
+            Icon(Icons.lock_outline_rounded, size: 15, color: AppColors.textMuted),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
                 'Only $creatorName can edit this ${isPayment ? 'payment' : 'expense'}',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+                style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
               ),
             ),
           ],
@@ -333,47 +335,19 @@ class _DetailBody extends StatelessWidget {
     String currency,
     double amount,
   ) {
-    return Column(
-      children: [
-        const SizedBox(height: AppSpacing.sm),
-        Container(
-          width: 84,
-          height: 84,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [style.color, Color.lerp(style.color, Colors.black, 0.18)!],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(AppRadius.xl),
-            boxShadow: AppShadows.glow(style.color),
-          ),
-          child: Icon(style.icon, color: Colors.white, size: 40),
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
+      child: KhataTotal(
+        label: (expense['description'] ?? 'Expense').toString(),
+        amount: Fmt.money(amount, currencyCode: currency),
+        caption: style.name,
+        trailing: IconBadge(
+          icon: style.icon,
+          color: AppColors.onHero,
+          size: 40,
+          iconSize: 20,
         ),
-        const SizedBox(height: AppSpacing.lg),
-        Text(
-          (expense['description'] ?? 'Expense').toString(),
-          textAlign: TextAlign.center,
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            Fmt.money(amount, currencyCode: currency),
-            style: const TextStyle(
-              fontSize: 40,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -1,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        StatusPill(label: style.name.toUpperCase(), color: style.color, icon: style.icon),
-      ],
+      ),
     );
   }
 
@@ -391,70 +365,59 @@ class _DetailBody extends StatelessWidget {
     final payerName = _nameFor(payer, names);
     final receiverName = receiver.isEmpty ? 'someone' : _nameFor(receiver, names);
 
-    Widget person(String uid, String label) => Expanded(
-          child: Column(
+    Widget person(String uid, String label) => Flexible(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               AppAvatar(
                 name: _avatarName(uid, names),
                 imageUrl: _avatarFor(uid),
-                radius: 30,
-                ring: true,
+                radius: 16,
               ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+              const SizedBox(width: AppSpacing.sm),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
                 ),
               ),
             ],
           ),
         );
 
-    return AppCard(
-      gradient: AppColors.positiveGradient,
-      padding: const EdgeInsets.fromLTRB(16, 22, 16, 22),
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              person(payer, payerName),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.arrow_forward_rounded, color: Colors.white),
-              ),
-              person(receiver, receiverName),
-            ],
+          KhataTotal(
+            label: 'Payment',
+            amount: Fmt.money(amount, currencyCode: currency),
+            caption: '$payerName paid $receiverName',
           ),
           const SizedBox(height: AppSpacing.lg),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              Fmt.money(amount, currencyCode: currency),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 38,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -1,
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '$payerName paid $receiverName',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.9),
-              fontWeight: FontWeight.w500,
-              fontSize: 14.5,
+          Semantics(
+            label: '$payerName to $receiverName',
+            excludeSemantics: true,
+            child: Row(
+              children: [
+                person(payer, payerName),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 20,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                person(receiver, receiverName),
+              ],
             ),
           ),
         ],
@@ -467,8 +430,7 @@ class _DetailBody extends StatelessWidget {
     final updated = e['updatedAt'] != null;
     return Text(
       '$date · Added by $creatorName${updated ? ' · edited ${Fmt.relative(e['updatedAt'])}' : ''}',
-      textAlign: TextAlign.center,
-      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+      style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
     );
   }
 
@@ -517,13 +479,10 @@ class _DetailBody extends StatelessWidget {
     }
 
     return AppCard(
-      color: color.withValues(alpha: 0.08),
-      shadow: false,
-      border: Border.all(color: color.withValues(alpha: 0.25)),
       child: Row(
         children: [
-          IconBadge(icon: icon, color: color, filled: true, size: 44, iconSize: 22),
-          const SizedBox(width: 14),
+          Icon(icon, color: color, size: 24),
+          const SizedBox(width: AppSpacing.md + 2),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -533,14 +492,16 @@ class _DetailBody extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16.5,
                     fontWeight: FontWeight.w700,
-                    color: color == AppColors.textSecondary ? AppColors.textPrimary : color,
+                    color: color == AppColors.negative
+                        ? AppColors.negative
+                        : AppColors.textPrimary,
                   ),
                 ),
                 if (subtitle != null) ...[
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                    style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                   ),
                 ],
               ],
@@ -572,7 +533,7 @@ class _DetailBody extends StatelessWidget {
       child: Column(
         children: [
           for (var i = 0; i < uids.length; i++) ...[
-            if (i > 0) const Divider(height: 1, color: AppColors.border),
+            if (i > 0) Divider(height: 1, color: AppColors.border),
             _splitRow(uids[i], me, payer, splits, names, currency),
           ],
         ],
@@ -628,11 +589,10 @@ class _DetailBody extends StatelessWidget {
               ),
             ),
             if (settled) ...[
-              const SizedBox(height: 4),
-              const StatusPill(
-                label: 'SETTLED',
-                color: AppColors.positive,
-                icon: Icons.check_rounded,
+              const SizedBox(height: 2),
+              Text(
+                'settled',
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
               ),
             ],
           ],
@@ -671,7 +631,7 @@ class _PersonRow extends StatelessWidget {
                 name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -682,7 +642,7 @@ class _PersonRow extends StatelessWidget {
                 subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -711,7 +671,7 @@ class _GroupChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(AppRadius.pill),
-            boxShadow: AppShadows.soft,
+            border: Border.all(color: AppColors.border),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -723,7 +683,7 @@ class _GroupChip extends StatelessWidget {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -731,7 +691,7 @@ class _GroupChip extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 2),
-              const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
+              Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
             ],
           ),
         ),
@@ -766,13 +726,13 @@ class _ReceiptThumb extends StatelessWidget {
             tag: heroTag,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(AppRadius.sm),
-              child: CachedNetworkImage(
-                imageUrl: url,
+              child: AppImage(
+                url: url,
                 width: 72,
                 height: 72,
                 fit: BoxFit.cover,
-                placeholder: (_, _) => const Skeleton(width: 72, height: 72, radius: 0),
-                errorWidget: (_, _, _) => const SizedBox(
+                placeholder: const Skeleton(width: 72, height: 72, radius: 0),
+                error: SizedBox(
                   width: 72,
                   height: 72,
                   child: ColoredBox(
@@ -784,7 +744,7 @@ class _ReceiptThumb extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -804,7 +764,7 @@ class _ReceiptThumb extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(Icons.open_in_full_rounded, size: 20, color: AppColors.textMuted),
+          Icon(Icons.open_in_full_rounded, size: 20, color: AppColors.textMuted),
         ],
       ),
     );
@@ -829,13 +789,13 @@ class _ReceiptViewer extends StatelessWidget {
               child: Center(
                 child: Hero(
                   tag: heroTag,
-                  child: CachedNetworkImage(
-                    imageUrl: url,
+                  child: AppImage(
+                    url: url,
                     fit: BoxFit.contain,
-                    placeholder: (_, _) => const Center(
+                    placeholder: const Center(
                       child: CircularProgressIndicator(color: Colors.white),
                     ),
-                    errorWidget: (_, _, _) => const Center(
+                    error: const Center(
                       child: Text(
                         'Couldn\'t load the receipt',
                         style: TextStyle(color: Colors.white),
@@ -873,13 +833,20 @@ class _DetailSkeleton extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.lg, AppSpacing.page, 0),
       children: const [
-        Center(child: Skeleton(width: 84, height: 84, radius: AppRadius.xl)),
-        SizedBox(height: 18),
-        Center(child: Skeleton(width: 180, height: 18)),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Skeleton(width: 140, height: 14),
+        ),
+        SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Skeleton(width: 200, height: 40),
+        ),
         SizedBox(height: 12),
-        Center(child: Skeleton(width: 140, height: 34)),
-        SizedBox(height: 12),
-        Center(child: Skeleton(width: 220, height: 12)),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Skeleton(width: 220, height: 12),
+        ),
         SizedBox(height: 28),
         Skeleton(height: 72, radius: AppRadius.lg),
         SizedBox(height: 28),

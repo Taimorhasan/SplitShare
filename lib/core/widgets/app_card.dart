@@ -3,7 +3,8 @@ import '../app_colors.dart';
 import '../app_theme.dart';
 import 'pressable.dart';
 
-/// Standard white surface card with soft shadow.
+/// A soft card: surface ground with a thin border, no shadow.
+/// [shadow] is kept for API compatibility and now means "draw the rule".
 class AppCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -36,8 +37,10 @@ class AppCard extends StatelessWidget {
         color: gradient == null ? (color ?? AppColors.surface) : null,
         gradient: gradient,
         borderRadius: BorderRadius.circular(radius),
-        boxShadow: shadow ? AppShadows.soft : null,
-        border: border,
+        border: border ??
+            (shadow && gradient == null && color == null
+                ? Border.all(color: AppColors.border)
+                : null),
       ),
       child: child,
     );
@@ -77,7 +80,7 @@ class IconBadge extends StatelessWidget {
         color: filled ? color : color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(size * 0.32),
       ),
-      child: Icon(icon, color: filled ? Colors.white : color, size: iconSize),
+      child: Icon(icon, color: filled ? AppColors.onPrimary : color, size: iconSize),
     );
   }
 }
@@ -112,8 +115,8 @@ class SectionHeader extends StatelessWidget {
             child: Text(
               title,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
                   ),
             ),
           ),
@@ -127,14 +130,14 @@ class SectionHeader extends StatelessWidget {
                   children: [
                     Text(
                       actionLabel!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w600,
                         fontSize: 13.5,
                       ),
                     ),
                     const SizedBox(width: 2),
-                    const Icon(
+                    Icon(
                       Icons.chevron_right_rounded,
                       size: 18,
                       color: AppColors.primary,
@@ -195,7 +198,7 @@ class StatusPill extends StatelessWidget {
 /// A tappable settings / navigation row used in lists.
 class AppListTile extends StatelessWidget {
   final IconData icon;
-  final Color iconColor;
+  final Color? iconColor;
   final String title;
   final String? subtitle;
   final Widget? trailing;
@@ -207,7 +210,7 @@ class AppListTile extends StatelessWidget {
     super.key,
     required this.icon,
     required this.title,
-    this.iconColor = AppColors.primary,
+    this.iconColor,
     this.subtitle,
     this.trailing,
     this.onTap,
@@ -217,7 +220,7 @@ class AppListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = destructive ? AppColors.error : iconColor;
+    final color = destructive ? AppColors.error : (iconColor ?? AppColors.primary);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -249,7 +252,7 @@ class AppListTile extends StatelessWidget {
                         subtitle!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12.5,
                           color: AppColors.textSecondary,
                         ),
@@ -260,7 +263,7 @@ class AppListTile extends StatelessWidget {
               ),
               ?trailing,
               if (trailing == null && showChevron && onTap != null)
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
                   color: AppColors.textMuted,
                 ),

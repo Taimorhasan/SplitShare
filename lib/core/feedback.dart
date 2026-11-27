@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'app_colors.dart';
+import 'app_theme.dart';
 
 /// Consistent, non-blocking user feedback (toasts).
 ///
@@ -163,18 +164,10 @@ class _ToastViewState extends State<_ToastView>
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(14, 12, 16, 12),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border(
-                      left: BorderSide(color: widget.color, width: 4),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
-                        blurRadius: 24,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    border: Border.all(color: AppColors.border),
+                    boxShadow: AppShadows.sheet,
                   ),
                   child: Row(
                     children: [
@@ -194,7 +187,7 @@ class _ToastViewState extends State<_ToastView>
                           children: [
                             Text(
                               widget.title,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14.5,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.textPrimary,
@@ -205,7 +198,7 @@ class _ToastViewState extends State<_ToastView>
                               widget.message,
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13.5,
                                 color: AppColors.textSecondary,
                                 height: 1.35,

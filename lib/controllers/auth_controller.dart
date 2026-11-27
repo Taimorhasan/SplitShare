@@ -20,7 +20,11 @@ class AuthController extends GetxController {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+  // Only used on Android/iOS; the web flow uses Firebase's popup instead
+  // (creating it on web asserts because no web client ID is configured).
+  GoogleSignIn? _googleSignInInstance;
+  GoogleSignIn get _googleSignIn =>
+      _googleSignInInstance ??= GoogleSignIn(scopes: ['email', 'profile']);
   final Rxn<User> _firebaseUser = Rxn<User>();
 
   User? get user => _firebaseUser.value ?? _auth.currentUser;
@@ -274,9 +278,11 @@ class AuthController extends GetxController {
   // ---------- Session / password ----------
 
   Future<void> logout() async {
-    try {
-      await _googleSignIn.signOut();
-    } catch (_) {}
+    if (!kIsWeb) {
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
+    }
     await _auth.signOut();
     Get.offAllNamed(AppRoutes.login);
   }

@@ -46,7 +46,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final illustration =
-        (MediaQuery.sizeOf(context).height * 0.24).clamp(150.0, 220.0);
+        (MediaQuery.sizeOf(context).height * 0.22).clamp(140.0, 200.0);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: const AppTopBar(title: 'Reset password'),
@@ -66,11 +66,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     icon: Icons.lock_reset_rounded,
                     badgeIcon: Icons.mail_rounded,
                     size: illustration,
-                    orbitIcons: const [
-                      Icons.key_rounded,
-                      Icons.shield_rounded,
-                      Icons.alternate_email_rounded,
-                    ],
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xxl),

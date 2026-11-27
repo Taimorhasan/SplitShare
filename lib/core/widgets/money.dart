@@ -48,7 +48,7 @@ class BalanceLabel extends StatelessWidget {
       return Column(
         crossAxisAlignment: alignment,
         mainAxisSize: MainAxisSize.min,
-        children: const [
+        children: [
           Text(
             'settled up',
             style: TextStyle(

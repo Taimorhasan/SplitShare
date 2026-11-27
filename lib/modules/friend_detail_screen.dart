@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../app/routes/app_routes.dart';
+import '../controllers/balances.dart';
 import '../controllers/expense_controller.dart';
+import '../controllers/trip_controller.dart';
 import '../controllers/friend_controller.dart';
 import '../controllers/profile_controller.dart';
 import '../controllers/shell_controller.dart';
@@ -116,7 +118,48 @@ class _FriendDetailScreenState extends State<FriendDetailScreen> {
       );
       return;
     }
+    // Only group balances left? Settle them right here.
+    if (Balances.expensesWith(_uid).isEmpty) {
+      _markTripsPaid(name);
+      return;
+    }
     Get.toNamed(AppRoutes.settleUp, arguments: {'uid': _uid});
+  }
+
+  bool _settlingTrips = false;
+
+  /// Records pay-backs in every group shared with this person.
+  Future<void> _markTripsPaid(String name) async {
+    if (_settlingTrips) return;
+    final first = Fmt.firstName(name);
+    final owed = Balances.tripsWith(_uid);
+    final pref = ProfileController.to.currencyCode.value;
+    final v = owed[pref] ?? (owed.isEmpty ? 0 : owed.values.first);
+    final ok = await AppDialogs.confirm(
+      title: 'Mark group balances as paid?',
+      message: v < 0
+          ? 'You paid $first ${Fmt.multi(owed, preferred: pref)} for your groups. '
+                'This records it in every group you share.'
+          : '$first paid you ${Fmt.multi(owed, preferred: pref)} for your groups. '
+                'This records it in every group you share.',
+      confirmLabel: 'Mark paid',
+      icon: Icons.check_circle_rounded,
+    );
+    if (!ok || !mounted) return;
+    setState(() => _settlingTrips = true);
+    try {
+      final n = await TripController.to.settleAllWith(_uid);
+      AppToast.success(
+        n == 0
+            ? 'Nothing left to settle in your groups.'
+            : 'Recorded in $n ${n == 1 ? 'group' : 'groups'}.',
+        title: 'Groups settled',
+      );
+    } catch (e) {
+      AppToast.error(AppToast.friendly(e));
+    } finally {
+      if (mounted) setState(() => _settlingTrips = false);
+    }
   }
 
   Future<void> _remind(String name) async {
@@ -237,7 +280,12 @@ class _FriendDetailScreenState extends State<FriendDetailScreen> {
                 child: Obx(() {
                   final p = _person();
                   final preferred = ProfileController.to.currencyCode.value;
-                  final balance = _expenses.balanceWith(_uid);
+                  _expenses.balances.length;
+                  // Expenses + groups, cancelled against each other (net),
+                  // and the two directions kept apart (gross).
+                  final balance = Balances.withPerson(_uid);
+                  final gross = Balances.grossWith(_uid);
+                  final tripLines = Balances.tripLinesWith(_uid);
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -248,11 +296,26 @@ class _FriendDetailScreenState extends State<FriendDetailScreen> {
                         child: _BalanceCard(
                           name: _nameOf(p),
                           balance: balance,
+                          theyOwe: gross.theyOwe,
+                          iOwe: gross.iOwe,
                           preferred: preferred,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       FadeSlideIn(index: 2, child: _actions(p, balance)),
+                      if (tripLines.isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.lg),
+                        FadeSlideIn(
+                          index: 3,
+                          child: _GroupsCard(
+                            name: _nameOf(p),
+                            lines: tripLines,
+                            preferred: preferred,
+                            busy: _settlingTrips,
+                            onMarkPaid: () => _markTripsPaid(_nameOf(p)),
+                          ),
+                        ),
+                      ],
                     ],
                   );
                 }),
@@ -312,14 +375,14 @@ class _FriendDetailScreenState extends State<FriendDetailScreen> {
         if (isFriend)
           StatusPill(
             label: Fmt.date(addedAt).isEmpty
-                ? 'FRIENDS'
-                : 'FRIENDS SINCE ${Fmt.date(addedAt).toUpperCase()}',
+                ? 'Friends'
+                : 'Friends since ${Fmt.date(addedAt)}',
             color: AppColors.positive,
             icon: Icons.check_circle_rounded,
           )
         else ...[
-          const StatusPill(
-            label: 'NOT IN YOUR FRIENDS',
+          StatusPill(
+            label: 'Not in your friends',
             color: AppColors.textSecondary,
             icon: Icons.person_outline_rounded,
           ),
@@ -352,43 +415,45 @@ class _FriendDetailScreenState extends State<FriendDetailScreen> {
   Widget _actions(Map<String, dynamic> p, Map<String, double> balance) {
     final name = _nameOf(p);
     final hasBalance = balance.values.any((v) => v.abs() >= 0.005);
-    final owesMe = balance.values.any((v) => v >= 0.005);
-    return AppCard(
-      padding: const EdgeInsets.symmetric(
-        vertical: AppSpacing.md,
-        horizontal: AppSpacing.sm,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _ActionTile(
-              icon: Icons.add_rounded,
-              label: 'Add expense',
-              color: AppColors.primary,
-              onTap: () => _addExpense(p),
-            ),
+    // Reminders are sent for friends & groups debts.
+    final owesMe = Balances.expensesWith(_uid).values.any((v) => v >= 0.005);
+    // Three buttons don't have room for icons on a phone.
+    final compact = owesMe;
+    return Row(
+      children: [
+        Expanded(
+          child: AppButton(
+            label: 'Add expense',
+            icon: compact ? null : Icons.add_rounded,
+            height: 46,
+            onPressed: () => _addExpense(p),
           ),
-          Expanded(
-            child: _ActionTile(
-              icon: Icons.handshake_rounded,
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Opacity(
+            // Still tappable: explains there's nothing to settle.
+            opacity: hasBalance ? 1 : 0.5,
+            child: AppButton.outline(
               label: 'Settle up',
-              color: AppColors.positive,
-              dimmed: !hasBalance,
-              onTap: () => _settleUp(hasBalance, name),
+              icon: compact ? null : Icons.handshake_rounded,
+              height: 46,
+              onPressed: () => _settleUp(hasBalance, name),
             ),
           ),
-          if (owesMe)
-            Expanded(
-              child: _ActionTile(
-                icon: Icons.notifications_active_rounded,
-                label: 'Remind',
-                color: AppColors.warning,
-                loading: _reminding,
-                onTap: () => _remind(name),
-              ),
+        ),
+        if (owesMe) ...[
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: AppButton.outline(
+              label: 'Remind',
+              height: 46,
+              loading: _reminding,
+              onPressed: () => _remind(name),
             ),
+          ),
         ],
-      ),
+      ],
     );
   }
 
@@ -430,49 +495,60 @@ class _FriendDetailScreenState extends State<FriendDetailScreen> {
           );
         }
 
-        // Build "header, tile, tile, header, tile..." rows grouped by day.
-        final rows = <Object>[];
-        String? current;
+        // Group by day: a plain day label, then one ruled block of rows.
+        final days = <({String label, List<Map<String, dynamic>> items})>[];
         for (final e in items) {
           final label = Fmt.dayGroup(e['createdAt'] ?? e['date']);
-          if (label != current) {
-            rows.add(label);
-            current = label;
+          if (days.isEmpty || days.last.label != label) {
+            days.add((label: label, items: [e]));
+          } else {
+            days.last.items.add(e);
           }
-          rows.add(e);
         }
 
         return SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
           sliver: SliverList.builder(
-            itemCount: rows.length,
+            itemCount: days.length,
             itemBuilder: (_, i) {
-              final row = rows[i];
-              if (row is String) {
-                return Padding(
-                  padding: EdgeInsets.only(
-                    top: i == 0 ? 0 : AppSpacing.lg,
-                    bottom: AppSpacing.sm,
-                    left: 4,
-                  ),
-                  child: Text(
-                    row.toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.6,
-                      color: AppColors.textMuted,
+              final day = days[i];
+              return FadeSlideIn(
+                key: ValueKey('day-${day.label}'),
+                index: i,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.only(
+                        top: i == 0 ? 0 : AppSpacing.xl,
+                        bottom: AppSpacing.sm,
+                        left: 2,
+                      ),
+                      child: Text(
+                        day.label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                     ),
-                  ),
-                );
-              }
-              final e = row as Map<String, dynamic>;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: FadeSlideIn(
-                  key: ValueKey('exp-${e['id']}'),
-                  index: i,
-                  child: ExpenseTile(expense: e),
+                    AppCard(
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        children: [
+                          for (var j = 0; j < day.items.length; j++) ...[
+                            if (j > 0) const Divider(height: 1),
+                            ExpenseTile(
+                              key: ValueKey('exp-${day.items[j]['id']}'),
+                              expense: day.items[j],
+                              card: false,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               );
             },
@@ -483,223 +559,175 @@ class _FriendDetailScreenState extends State<FriendDetailScreen> {
   }
 }
 
+/// Both directions side by side ("You owe Ali" / "Ali owes you") on a split
+/// bar, with the overall net as the headline.
 class _BalanceCard extends StatelessWidget {
   final String name;
+
+  /// Net per currency, positive = they owe me.
   final Map<String, double> balance;
+  final Map<String, double> theyOwe;
+  final Map<String, double> iOwe;
   final String preferred;
 
   const _BalanceCard({
     required this.name,
     required this.balance,
+    required this.theyOwe,
+    required this.iOwe,
     required this.preferred,
   });
 
   @override
   Widget build(BuildContext context) {
-    final owed = <String, double>{};
-    final owe = <String, double>{};
-    balance.forEach((cur, v) {
-      if (v >= 0.005) owed[cur] = v;
-      if (v <= -0.005) owe[cur] = -v;
-    });
     final first = Fmt.firstName(name);
 
-    final settled = owed.isEmpty && owe.isEmpty;
-    final primary =
-        balance[preferred] ??
-        (balance.values.where((v) => v.abs() >= 0.005).firstOrNull ?? 0);
+    if (theyOwe.isEmpty && iOwe.isEmpty) {
+      return KhataTotal(
+        label: 'All settled up',
+        amount: Fmt.money(0, currencyCode: preferred),
+        color: AppColors.textMuted,
+        caption: "You and $first don't owe each other anything.",
+      );
+    }
+
+    // The bar compares one currency: the preferred one if it is involved,
+    // else the first one that is.
+    final barCur = theyOwe.containsKey(preferred) || iOwe.containsKey(preferred)
+        ? preferred
+        : (theyOwe.keys.followedBy(iOwe.keys)).first;
+
+    final nonZero = balance.values.where((v) => v.abs() >= 0.005).toList();
+    final primary = balance[preferred] ?? nonZero.firstOrNull ?? 0;
     final dir = BalanceDirectionX.fromNet(primary);
+    final mixed = nonZero.any((v) => v.sign != primary.sign);
 
-    if (settled) {
-      return AppCard(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Row(
-          children: [
-            const IconBadge(
-              icon: Icons.verified_rounded,
-              color: AppColors.positive,
-              size: 52,
-              iconSize: 26,
-            ),
-            const SizedBox(width: AppSpacing.lg),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'All settled up',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'You and $first don\'t owe each other anything.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final gradient = dir == BalanceDirection.youOwe
-        ? AppColors.negativeGradient
-        : AppColors.positiveGradient;
-
-    Widget line(String caption, Map<String, double> m, {bool big = true}) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            caption,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.85),
-              fontWeight: FontWeight.w600,
-              fontSize: 13.5,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            Fmt.multi(m, preferred: preferred),
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: big ? 30 : 20,
-              letterSpacing: -0.5,
-            ),
-          ),
-        ],
-      );
-    }
-
-    final owedFirst = dir != BalanceDirection.youOwe;
-    final blocks = <Widget>[
-      if (owedFirst && owed.isNotEmpty) line('$first owes you', owed),
-      if (owe.isNotEmpty)
-        line('You owe $first', owe, big: !owedFirst || owed.isEmpty),
-      if (!owedFirst && owed.isNotEmpty)
-        line('$first owes you', owed, big: false),
-    ];
-
-    return AppCard(
-      gradient: gradient,
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var i = 0; i < blocks.length; i++) ...[
-                  if (i > 0) const SizedBox(height: AppSpacing.md),
-                  blocks[i],
-                ],
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              owedFirst ? Icons.south_west_rounded : Icons.north_east_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
-        ],
-      ),
+    return KhataTotal(
+      label: switch (dir) {
+        _ when mixed => 'Overall balance',
+        BalanceDirection.owedToYou => 'Overall you get back',
+        BalanceDirection.youOwe => 'Overall you owe',
+        BalanceDirection.settled => 'All settled up',
+      },
+      amount: Fmt.multi(balance, preferred: preferred, absolute: !mixed),
+      color: mixed
+          ? null
+          : switch (dir) {
+              BalanceDirection.youOwe => AppColors.negative,
+              BalanceDirection.settled => AppColors.textMuted,
+              BalanceDirection.owedToYou => null,
+            },
+      owed: theyOwe[barCur] ?? 0,
+      owe: iOwe[barCur] ?? 0,
+      owedLabel: '$first owes you\n${Fmt.multi(theyOwe, preferred: preferred)}',
+      oweLabel: 'You owe $first\n${Fmt.multi(iOwe, preferred: preferred)}',
+      caption: dir == BalanceDirection.settled && !mixed
+          ? 'What you owe each other cancels out.'
+          : null,
     );
   }
 }
 
-class _ActionTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  final bool dimmed;
-  final bool loading;
+/// Group balances with this person, group by group, and a one-tap way to
+/// record that they've been paid.
+class _GroupsCard extends StatelessWidget {
+  final String name;
+  final List<({String tripId, String title, double amount, String currency})>
+  lines;
+  final String preferred;
+  final bool busy;
+  final VoidCallback onMarkPaid;
 
-  const _ActionTile({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-    this.dimmed = false,
-    this.loading = false,
+  const _GroupsCard({
+    required this.name,
+    required this.lines,
+    required this.preferred,
+    required this.busy,
+    required this.onMarkPaid,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: label,
-      child: Pressable(
-        onTap: loading ? null : onTap,
-        child: AnimatedOpacity(
-          duration: AppMotion.fast,
-          opacity: dimmed ? 0.45 : 1,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              vertical: AppSpacing.xs,
-              horizontal: 2,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  alignment: Alignment.center,
-                  child: AnimatedSwitcher(
-                    duration: AppMotion.fast,
-                    child: loading
-                        ? SizedBox(
-                            key: const ValueKey('l'),
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.2,
-                              color: color,
-                            ),
-                          )
-                        : Icon(
-                            icon,
-                            key: const ValueKey('i'),
-                            color: color,
-                            size: 24,
-                          ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+    final first = Fmt.firstName(name);
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.groups_rounded,
+                size: 18,
+                color: AppColors.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'In groups',
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ),
+          const SizedBox(height: 8),
+          for (final l in lines)
+            InkWell(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              onTap: () => Get.toNamed(
+                AppRoutes.tripDetail,
+                arguments: {'id': l.tripId},
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 2),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      l.amount > 0
+                          ? '$first owes you ${Fmt.money(l.amount, currencyCode: l.currency)}'
+                          : 'You owe ${Fmt.money(-l.amount, currencyCode: l.currency)}',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: l.amount > 0
+                            ? AppColors.positive
+                            : AppColors.negative,
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: AppColors.textMuted,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
+          AppButton(
+            label: 'Mark group balances as paid',
+            icon: Icons.check_circle_rounded,
+            variant: AppButtonVariant.success,
+            height: 46,
+            loading: busy,
+            onPressed: onMarkPaid,
+          ),
+        ],
       ),
     );
   }
