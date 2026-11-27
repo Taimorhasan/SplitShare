@@ -3,7 +3,7 @@ import 'app_colors.dart';
 
 /// Visual metadata for a category / group type.
 ///
-/// Colours are muted pen inks (the khata world): one shade for the white
+/// Colours are muted inks: one shade for the light
 /// page and a lighter one for the night page.
 class CategoryStyle {
   final String name;

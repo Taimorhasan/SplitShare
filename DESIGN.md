@@ -104,5 +104,5 @@ Map: lib/core/app_theme.dart
 Map: lib/core/widgets/
 Map: tool/render_app_icon_test.dart
 Map: assets/fonts
-Map: lib/core/widgets/khata_total.dart
+Map: lib/core/widgets/balance_card.dart
 Full: .impeccable/design-full.md (read a section when you need its detail)

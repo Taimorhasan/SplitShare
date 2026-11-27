@@ -4,7 +4,7 @@
 /// reusable component it needs.
 library;
 
-export 'app_avatar.dart';
+export 'widgets/app_avatar.dart';
 export 'app_colors.dart';
 export 'app_theme.dart';
 export 'categories.dart';
@@ -18,7 +18,7 @@ export 'widgets/app_text_field.dart';
 export 'widgets/app_top_bar.dart';
 export 'widgets/dialogs.dart';
 export 'widgets/illustration.dart';
-export 'widgets/khata_total.dart';
+export 'widgets/balance_card.dart';
 export 'widgets/money.dart';
 export 'widgets/pressable.dart';
 export 'widgets/states.dart';

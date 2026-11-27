@@ -62,7 +62,7 @@
     "typographyMeta": {
       "total": {
         "displayName": "Total",
-        "purpose": "The one main figure per screen, inside KhataTotal."
+        "purpose": "The one main figure per screen, inside BalanceCard."
       },
       "body": {
         "displayName": "Body",

@@ -2,9 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../app_colors.dart';
 
-/// Quiet, static spot illustration in the khata world: a small register
-/// page — a ruled card with the subject's icon written on it in ink, and a
-/// short red double rule like the line under a total.
+/// Quiet, static spot illustration: a small card with the subject's icon,
+/// one ruled line and a short accent double line.
 ///
 /// No floating, orbiting or glowing parts. [orbitIcons] and [animate] are
 /// accepted for API compatibility and ignored; [badgeIcon] shows as a small

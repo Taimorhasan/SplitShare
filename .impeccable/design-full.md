@@ -123,7 +123,7 @@ Rounded: 10 / 14 / 20, 26 for the balance card and sheets, pills for chips and n
 
 ## Components
 
-- **KhataTotal** (balance card, `lib/core/widgets/khata_total.dart`): one per screen. Pistachio by default, pomegranate tint when you owe, muted when settled. Optional owed/owe split bar and a `trailing` icon.
+- **BalanceCard** (`lib/core/widgets/balance_card.dart`): one per screen. Pistachio by default, pomegranate tint when you owe, muted when settled. Optional owed/owe split bar and a `trailing` icon.
 - **Buttons**: flat, 52px, radius 14; primary = pistachio.
 - **Cards** (`AppCard`): cream surface, 1px border, radius 20.
 - **Nav**: a floating dark pill, icon-only with tooltips and screen-reader labels; the selected tab sits on a pistachio capsule; saffron add button in the middle.

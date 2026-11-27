@@ -10,14 +10,14 @@ Audience/job: friends, roommates and trip groups in Pakistan checking who owes w
 
 ## Direction contract
 
-THESIS: SplitShare is the udhaar khata in your pocket. It refuses the category default of white cards, green-for-owed pills and gradient hero cards.
+THESIS: Splitting the bill over chai: warm, friendly and exact. It refuses the category default of cold white cards, gradient hero cards and identical card grids.
 
-OWN-WORLD: White register page (night: ink-black page), ballpoint-blue ink for text, figures and the primary action, register red only for what you owe and for the total rule, blue-grey for secondary. No gradients, glows or shadows: lists on hairline rules, small 8px radii, tabular figures for every amount.
+OWN-WORLD: Cream page with soft rounded cards (night: roasted-chai brown), pistachio for actions and money coming back, pomegranate for what you owe, saffron only for the add button. Figtree with tabular figures. No gradients, glows or card shadows.
 
-STORY: Open the app, read your net in one glance, see each person as one ruled udhaar line (name left, amount right, "owes you" / "you owe" under it), tap to settle or add.
+STORY: Open the app, read your net on the balance card, swipe through friends, see the full history, tap + to add a payment to a group in seconds.
 
-FIRST VIEWPORT: Top: your name, then "Net balance" and the net amount large in blue ink, closed by a red double rule. Below: the udhaar list, one ruled row per person. Standard bottom navigation with one ink add button.
+FIRST VIEWPORT: Greeting and name, the pistachio balance card with the owed/owe split bar, a row of friend cards, quick actions, then History. Floating dark nav pill with a saffron add button.
 
-FORM: Khata (kiryana udhaar register), position 1 of 7 on my list (IMPECCABLE'S PICK). seed:dc69a8c736f2d61a. Signature: the khata total, a red double rule under every screen's main total.
+FORM: Chai & Pista (user's pick, direction B on the colour-directions canvas; replaced the earlier Khata direction). Signature: the balance card (BalanceCard) with its split bar, and the split-coin logo.
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance

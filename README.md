@@ -46,16 +46,25 @@ lib/
 │   ├── friend_controller.dart
 │   ├── group_controller.dart
 │   ├── expense_controller.dart   # balance maths, payments, settle-up
+│   ├── trip_controller.dart      # groups engine: people, payments, pair netting
+│   ├── balances.dart             # combines friends, expenses and groups
 │   ├── notification_controller.dart
+│   ├── theme_controller.dart     # light / dark / same-as-phone
 │   └── shell_controller.dart     # bottom-nav tab state + AppNav helpers
 ├── core/                     # Design system — import 'core/ui.dart'
 │   ├── app_colors.dart, app_theme.dart (spacing, radius, shadows, motion)
 │   ├── formatters.dart (money, dates), categories.dart, feedback.dart (toasts)
-│   └── widgets/ (buttons, cards, inputs, states, dialogs, illustrations…)
-└── modules/                  # Screens
-    ├── main_layout.dart      # App shell: fixed bottom bar + IndexedStack tabs
-    ├── widgets/expense_tile.dart
-    └── *_screen.dart
+│   ├── image_store.dart (free image storage in Firestore), error_reporter.dart
+│   └── widgets/ (buttons, cards, balance card, avatar, inputs, states…)
+└── modules/                  # Screens, one folder per feature
+    ├── shell/                # main_layout (swipeable tabs + nav), quick_add_sheet
+    ├── auth/                 # splash, onboarding, login, signup, passwords
+    ├── home/                 # dashboard, history, notifications
+    ├── groups/               # groups tab, group list, group detail
+    │   └── legacy/           # older groups made before the merge
+    ├── friends/              # friends, friend detail, add, requests, QR scan
+    ├── expenses/             # add expense, expense detail, settle up
+    └── profile/              # profile, edit profile, password, help
 ```
 
 ## Data model (Firestore)
@@ -66,8 +75,12 @@ lib/
   - `friends/{friendUid}` – friend preview.
   - `friendRequests/{senderUid}` – incoming requests.
   - `notifications/{id}` – inbox (`fromUid` must be the sender).
-- `groups/{id}` – `name`, `icon` (group type), `members[]`, `memberDetails[]`,
+- `groups/{id}` – older groups (before the merge): `name`, `icon` (group type), `members[]`, `memberDetails[]`,
   `currencyCode`, `createdBy`, `createdAt`, `lastActive`.
+- `trips/{id}` – a **group** (give-and-take engine): `title`, `icon` (group type),
+  `currencyCode`, `ownerUid`, `memberUids[]`, `people[{id,name,uid?}]`,
+  `payments[{id,personId,cents,note,at,splitAmong[]}]`,
+  `settlements[{id,fromId,toId,cents,at}]`. People don't need an account.
 - `expenses/{id}` – `type` (`expense` | `payment`), `amount`, `currencyCode`,
   `paidBy{uid,name}`, `individualSplits{uid: owed}`, `involvedUsers[]`,
   `participantNames`, `splitType`, `settledPairs[]`, `isSettled`, `createdBy`,

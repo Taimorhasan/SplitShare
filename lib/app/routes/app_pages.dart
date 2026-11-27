@@ -1,27 +1,27 @@
 import 'package:get/get.dart';
-import '../../modules/activity_screen.dart';
-import '../../modules/add_expense_screen.dart';
-import '../../modules/add_friends_screen.dart';
-import '../../modules/change_password_screen.dart';
-import '../../modules/create_group_screen.dart';
-import '../../modules/create_new_password_screen.dart';
-import '../../modules/edit_profile_screen.dart';
-import '../../modules/expense_detail_screen.dart';
-import '../../modules/friend_detail_screen.dart';
-import '../../modules/friend_requests_screen.dart';
-import '../../modules/group_detail_screen.dart';
-import '../../modules/help_screen.dart';
-import '../../modules/login_screen.dart';
-import '../../modules/main_layout.dart';
-import '../../modules/notifications_screen.dart';
-import '../../modules/onboarding_screen.dart';
-import '../../modules/reset_password_screen.dart';
-import '../../modules/scan_qr_screen.dart';
-import '../../modules/settle_up_screen.dart';
-import '../../modules/signup_screen.dart';
-import '../../modules/splash_screen.dart';
-import '../../modules/trip_detail_screen.dart';
-import '../../modules/trips_screen.dart';
+import '../../modules/home/history_screen.dart';
+import '../../modules/expenses/add_expense_screen.dart';
+import '../../modules/friends/add_friends_screen.dart';
+import '../../modules/profile/change_password_screen.dart';
+import '../../modules/groups/legacy/legacy_create_group_screen.dart';
+import '../../modules/auth/create_new_password_screen.dart';
+import '../../modules/profile/edit_profile_screen.dart';
+import '../../modules/expenses/expense_detail_screen.dart';
+import '../../modules/friends/friend_detail_screen.dart';
+import '../../modules/friends/friend_requests_screen.dart';
+import '../../modules/groups/legacy/legacy_group_detail_screen.dart';
+import '../../modules/profile/help_screen.dart';
+import '../../modules/auth/login_screen.dart';
+import '../../modules/shell/main_layout.dart';
+import '../../modules/home/notifications_screen.dart';
+import '../../modules/auth/onboarding_screen.dart';
+import '../../modules/auth/reset_password_screen.dart';
+import '../../modules/friends/scan_qr_screen.dart';
+import '../../modules/expenses/settle_up_screen.dart';
+import '../../modules/auth/signup_screen.dart';
+import '../../modules/auth/splash_screen.dart';
+import '../../modules/groups/group_detail_screen.dart';
+import '../../modules/groups/group_list.dart';
 import 'app_routes.dart';
 
 /// Route table.
@@ -62,7 +62,7 @@ class AppPages {
     GetPage(name: AppRoutes.addExpense, page: () => const AddExpenseScreen(),
         transition: Transition.downToUp),
     GetPage(name: AppRoutes.expenseDetail, page: () => const ExpenseDetailScreen()),
-    GetPage(name: AppRoutes.activity, page: () => const ActivityScreen()),
+    GetPage(name: AppRoutes.activity, page: () => const HistoryScreen()),
     GetPage(name: AppRoutes.settleUp, page: () => const SettleUpScreen()),
     GetPage(name: AppRoutes.notifications, page: () => const NotificationsScreen()),
     GetPage(name: AppRoutes.createGroup, page: () => const CreateGroupScreen(),
